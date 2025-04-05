@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 
 namespace XLayer
 {
@@ -10,7 +11,7 @@ namespace XLayer
         Decoder.MpegStreamReader _reader;
         MpegFrameDecoder _decoder;
 
-        object _seekLock = new object();
+        readonly Lock _seekLock = new();
         long _position;
 
         /// <summary>
@@ -94,7 +95,7 @@ namespace XLayer
             set
             {
                 if (!_reader.CanSeek) throw new InvalidOperationException("Cannot Seek!");
-                if (value < 0L) throw new ArgumentOutOfRangeException("value");
+                ArgumentOutOfRangeException.ThrowIfLessThan(value, 0L);
 
                 // we're thinking in 4-byte samples, pcmStep interleaved...  adjust accordingly
                 var samples = value / sizeof(float) / _reader.Channels;
@@ -111,7 +112,7 @@ namespace XLayer
                 {
                     // seek the stream
                     var newPos = _reader.SeekTo(samples);
-                    if (newPos == -1) throw new ArgumentOutOfRangeException("value");
+                    if (newPos == -1) throw new ArgumentOutOfRangeException(nameof(value));
 
                     _decoder.Reset();
 
@@ -168,7 +169,7 @@ namespace XLayer
         /// <returns>Sample size actually reads, in bytes.</returns>
         public int ReadSamples(byte[] buffer, int index, int count)
         {
-            if (index < 0 || index + count > buffer.Length) throw new ArgumentOutOfRangeException("index");
+            if (index < 0 || index + count > buffer.Length) throw new ArgumentOutOfRangeException(nameof(index));
 
             // make sure we're asking for an even number of samples
             count -= (count % sizeof(float));
@@ -198,7 +199,7 @@ namespace XLayer
         /// <returns>Sample count actually reads.</returns>
         public int ReadSamples(float[] buffer, int index, int count)
         {
-            if (index < 0 || index + count > buffer.Length) throw new ArgumentOutOfRangeException("index");
+            if (index < 0 || index + count > buffer.Length) throw new ArgumentOutOfRangeException(nameof(index));
 
             // ReadSampleImpl "thinks" in bytes, so adjust accordingly
             return ReadSamplesImpl(buffer, index * sizeof(float), count * sizeof(float), 32) / sizeof(float);
@@ -206,19 +207,19 @@ namespace XLayer
 
         public int ReadSamplesInt16(byte[] buffer, int index, int count)
         {
-            if (index < 0 || index + count > buffer.Length * sizeof(short)) throw new ArgumentOutOfRangeException("index");
+            if (index < 0 || index + count > buffer.Length * sizeof(short)) throw new ArgumentOutOfRangeException(nameof(index));
 
             return ReadSamplesImpl(buffer, index, count, 16) * sizeof(short) / sizeof(float);
         }
 
         public int ReadSamplesInt8(byte[] buffer, int index, int count)
         {
-            if (index < 0 || index + count > buffer.Length * sizeof(float)) throw new ArgumentOutOfRangeException("index");
+            if (index < 0 || index + count > buffer.Length * sizeof(float)) throw new ArgumentOutOfRangeException(nameof(index));
 
             return ReadSamplesImpl(buffer, index, count, 8) * sizeof(byte) / sizeof(float);
         }
 
-        float[] _readBuf = new float[1152 * 2];
+        readonly float[] _readBuf = new float[1152 * 2];
         int _readBufLen, _readBufOfs;
 
         int ReadSamplesImpl(Array buffer, int index, int count, int bitDepth)
@@ -250,13 +251,14 @@ namespace XLayer
                                         break;
                                     case 16:
                                         var value = (int)Math.Round(32767.5f * _readBuf[_readBufOfs / sizeof(float) + i] - 0.5f);
-                                        if (value < 0) {
+                                        if (value < 0)
+                                        {
                                             value += 65536;
                                         }
-    
+
                                         buffer.SetValue((byte)(value % 256), 2 * (index / sizeof(float) + i));
                                         buffer.SetValue((byte)(value / 256), 2 * (index / sizeof(float) + i) + 1);
-    
+
                                         break;
                                 }
                             }

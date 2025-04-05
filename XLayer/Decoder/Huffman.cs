@@ -6,10 +6,8 @@ namespace XLayer.Decoder
 {
     class Huffman
     {
-        #region Hardcoded Tables (from the spec)
-
         static readonly byte[][,] _codeTables =
-        {
+        [
             new byte[,] // 1
             {
                 {0x02, 0x01}, {0x00, 0x00}, {0x02, 0x01}, {0x00, 0x10},
@@ -767,9 +765,7 @@ namespace XLayer.Decoder
                 {0x04, 0x01}, {0x02, 0x01}, {0x00, 0x0c}, {0x00, 0x0d},
                 {0x02, 0x01}, {0x00, 0x0e}, {0x00, 0x0f},
             }
-        };
-
-        #endregion
+        ];
 
         static readonly float[] _floatLookup;
 
@@ -782,10 +778,10 @@ namespace XLayer.Decoder
             }
         }
 
-        static HuffmanListNode[] _llCache = new HuffmanListNode[_codeTables.Length];
-        static int[] _llCacheMaxBits = new int[_codeTables.Length];
+        static readonly HuffmanListNode[] _llCache = new HuffmanListNode[_codeTables.Length];
+        static readonly int[] _llCacheMaxBits = new int[_codeTables.Length];
 
-        static readonly int[] LIN_BITS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 8, 10, 13, 4, 5, 6, 7, 8, 9, 11, 13 };
+        static readonly int[] LIN_BITS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 8, 10, 13, 4, 5, 6, 7, 8, 9, 11, 13];
 
         internal static void Decode(BitReservoir br, int table, out float x, out float y)
         {
@@ -882,12 +878,10 @@ namespace XLayer.Decoder
         static byte DecodeSymbol(BitReservoir br, int table)
         {
             // get the huffman node for decoding
-            int maxBits;
-            var node = GetNode(table, out maxBits);
+            var node = GetNode(table, out int maxBits);
 
             // get some bits to work with
-            int readBits;
-            int bits = br.TryPeekBits(maxBits, out readBits);
+            int bits = br.TryPeekBits(maxBits, out int readBits);
             if (readBits < maxBits)
             {
                 bits <<= maxBits - readBits;
@@ -974,10 +968,9 @@ namespace XLayer.Decoder
                     var bits = 0;
                     var len = 0;
                     var idx = i;
-                    int bit;
                     do
                     {
-                        idx = FindPreviousNode(tree, idx, out bit);
+                        idx = FindPreviousNode(tree, idx, out int bit);
                         bits |= bit << len++;
                     } while (idx > 0);
 

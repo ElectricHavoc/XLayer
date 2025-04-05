@@ -14,7 +14,7 @@ namespace XLayer
         // we do it this way so the stereo interleaving code is in one place: DecodeFrameImpl(...)
         // if we ever add support for multi-channel, we'll have to add a pass after the initial
         //  stereo decode (since multi-channel basically uses the stereo channels as a reference)
-        float[] _ch0, _ch1;
+        readonly float[] _ch0, _ch1;
 
         public MpegFrameDecoder()
         {
@@ -59,14 +59,14 @@ namespace XLayer
         /// <returns></returns>
         public int DecodeFrame(IMpegFrame frame, byte[] dest, int destOffset)
         {
-            if (frame == null) throw new ArgumentNullException("frame");
-            if (dest == null) throw new ArgumentNullException("dest");
-            if (destOffset % 4 != 0) throw new ArgumentException("Must be an even multiple of 4", "destOffset");
+            ArgumentNullException.ThrowIfNull(frame);
+            ArgumentNullException.ThrowIfNull(dest);
+            if (destOffset % 4 != 0) throw new ArgumentException("Must be an even multiple of 4", nameof(destOffset));
 
             var bufferAvailable = (dest.Length - destOffset) / 4;
             if (bufferAvailable < (frame.ChannelMode == MpegChannelMode.Mono ? 1 : 2) * frame.SampleCount)
             {
-                throw new ArgumentException("Buffer not large enough!  Must be big enough to hold the frame's entire output.  This is up to 9,216 bytes.", "dest");
+                throw new ArgumentException("Buffer not large enough!  Must be big enough to hold the frame's entire output.  This is up to 9,216 bytes.", nameof(dest));
             }
 
             return DecodeFrameImpl(frame, dest, destOffset / 4) * 4;
@@ -94,12 +94,12 @@ namespace XLayer
         /// <returns></returns>
         public int DecodeFrame(IMpegFrame frame, float[] dest, int destOffset)
         {
-            if (frame == null) throw new ArgumentNullException("frame");
-            if (dest == null) throw new ArgumentNullException("dest");
+            ArgumentNullException.ThrowIfNull(frame);
+            ArgumentNullException.ThrowIfNull(dest);
 
             if (dest.Length - destOffset < (frame.ChannelMode == MpegChannelMode.Mono ? 1 : 2) * frame.SampleCount)
             {
-                throw new ArgumentException("Buffer not large enough!  Must be big enough to hold the frame's entire output.  This is up to 2,304 elements.", "dest");
+                throw new ArgumentException("Buffer not large enough!  Must be big enough to hold the frame's entire output.  This is up to 2,304 elements.", nameof(dest));
             }
 
             return DecodeFrameImpl(frame, dest, destOffset);
@@ -113,24 +113,15 @@ namespace XLayer
             switch (frame.Layer)
             {
                 case MpegLayer.LayerI:
-                    if (_layerIDecoder == null)
-                    {
-                        _layerIDecoder = new Decoder.LayerIDecoder();
-                    }
+                    _layerIDecoder ??= new Decoder.LayerIDecoder();
                     curDecoder = _layerIDecoder;
                     break;
                 case MpegLayer.LayerII:
-                    if (_layerIIDecoder == null)
-                    {
-                        _layerIIDecoder = new Decoder.LayerIIDecoder();
-                    }
+                    _layerIIDecoder ??= new Decoder.LayerIIDecoder();
                     curDecoder = _layerIIDecoder;
                     break;
                 case MpegLayer.LayerIII:
-                    if (_layerIIIDecoder == null)
-                    {
-                        _layerIIIDecoder = new Decoder.LayerIIIDecoder();
-                    }
+                    _layerIIIDecoder ??= new Decoder.LayerIIIDecoder();
                     curDecoder = _layerIIIDecoder;
                     break;
             }
@@ -174,18 +165,9 @@ namespace XLayer
         public void Reset()
         {
             // the synthesis filters need to be cleared
-            if (_layerIDecoder != null)
-            {
-                _layerIDecoder.ResetForSeek();
-            }
-            if (_layerIIDecoder != null)
-            {
-                _layerIIDecoder.ResetForSeek();
-            }
-            if (_layerIIIDecoder != null)
-            {
-                _layerIIIDecoder.ResetForSeek();
-            }
+            _layerIDecoder?.ResetForSeek();
+            _layerIIDecoder?.ResetForSeek();
+            _layerIIIDecoder?.ResetForSeek();
         }
     }
 }

@@ -41,10 +41,6 @@ namespace XLayer.Decoder
     {
         const int SSLIMIT = 18;
 
-        #region Child Classes
-
-        #endregion
-
         static internal bool GetCRC(MpegFrame frame, ref uint crc)
         {
             var cnt = frame.GetSideDataSize();
@@ -55,22 +51,22 @@ namespace XLayer.Decoder
             return true;
         }
 
-        HybridMDCT _hybrid = new HybridMDCT();
-        BitReservoir _bitRes = new BitReservoir();
+        readonly HybridMDCT _hybrid = new();
+        readonly BitReservoir _bitRes = new();
 
         internal LayerIIIDecoder()
         {
-            _tableSelect = new int[][][]
-            {
-                new int[][] { new int[3], new int[3] },
-                new int[][] { new int[3], new int[3] },
-            };
+            _tableSelect =
+            [
+                [new int[3], new int[3]],
+                [new int[3], new int[3]],
+            ];
 
-            _subblockGain = new float[][][]
-            {
-                new float[][] { new float[3], new float[3] },
-                new float[][] { new float[3], new float[3] },
-            };
+            _subblockGain =
+            [
+                [new float[3], new float[3]],
+                [new float[3], new float[3]],
+            ];
         }
 
         internal override int DecodeFrame(IMpegFrame frame, float[] ch0, float[] ch1)
@@ -196,30 +192,26 @@ namespace XLayer.Decoder
             _bitRes.Reset();
         }
 
-        #region Side Info
-
-        #region Variables
-
         int _channels, _privBits, _mainDataBegin;
 
-        int[][] _scfsi = { new int[4], new int[4] };                //     ch, scfsi_band
-        int[][] _part23Length = { new int[2], new int[2] };         // gr, ch
-        int[][] _bigValues = { new int[2], new int[2] };            // gr, ch
-        float[][] _globalGain = { new float[2], new float[2] };     // gr, ch
-        int[][] _scalefacCompress = { new int[2], new int[2] };     // gr, ch
-        bool[][] _blockSplitFlag = { new bool[2], new bool[2] };    // gr, ch
-        bool[][] _mixedBlockFlag = { new bool[2], new bool[2] };    // gr, ch
-        int[][] _blockType = { new int[2], new int[2] };            // gr, ch
-        int[][][] _tableSelect;                                     // gr, ch, region
-        float[][][] _subblockGain;                                  // gr, ch, window
-        int[][] _regionAddress1 = { new int[2], new int[2] };       // gr, ch
-        int[][] _regionAddress2 = { new int[2], new int[2] };       // gr, ch
-        int[][] _preflag = { new int[2], new int[2] };              // gr, ch
-        float[][] _scalefacScale = { new float[2], new float[2] };  // gr, ch
-        int[][] _count1TableSelect = { new int[2], new int[2] };    // gr, ch
+        readonly int[][] _scfsi = [new int[4], new int[4]];                //     ch, scfsi_band
+        readonly int[][] _part23Length = [new int[2], new int[2]];         // gr, ch
+        readonly int[][] _bigValues = [new int[2], new int[2]];            // gr, ch
+        readonly float[][] _globalGain = [new float[2], new float[2]];     // gr, ch
+        readonly int[][] _scalefacCompress = [new int[2], new int[2]];     // gr, ch
+        readonly bool[][] _blockSplitFlag = [new bool[2], new bool[2]];    // gr, ch
+        readonly bool[][] _mixedBlockFlag = [new bool[2], new bool[2]];    // gr, ch
+        readonly int[][] _blockType = [new int[2], new int[2]];            // gr, ch
+        readonly int[][][] _tableSelect;                                     // gr, ch, region
+        readonly float[][][] _subblockGain;                                  // gr, ch, window
+        readonly int[][] _regionAddress1 = [new int[2], new int[2]];       // gr, ch
+        readonly int[][] _regionAddress2 = [new int[2], new int[2]];       // gr, ch
+        readonly int[][] _preflag = [new int[2], new int[2]];              // gr, ch
+        readonly float[][] _scalefacScale = [new float[2], new float[2]];  // gr, ch
+        readonly int[][] _count1TableSelect = [new int[2], new int[2]];    // gr, ch
 
-        static float[] GAIN_TAB =
-        {
+        static readonly float[] GAIN_TAB =
+        [
             1.57009245868378E-16f, 1.86716512307887E-16f, 2.22044604925031E-16f, 2.64057024024816E-16f, 3.14018491736756E-16f, 3.73433024615774E-16f, 4.44089209850063E-16f, 5.28114048049630E-16f,
             6.28036983473509E-16f, 7.46866049231544E-16f, 8.88178419700125E-16f, 1.05622809609926E-15f, 1.25607396694702E-15f, 1.49373209846309E-15f, 1.77635683940025E-15f, 2.11245619219853E-15f,
             2.51214793389404E-15f, 2.98746419692619E-15f, 3.55271367880050E-15f, 4.22491238439706E-15f, 5.02429586778810E-15f, 5.97492839385238E-15f, 7.10542735760100E-15f, 8.44982476879408E-15f,
@@ -252,9 +244,7 @@ namespace XLayer.Decoder
             4.52548339959390E+01f, 5.38173705762377E+01f, 6.40000000000000E+01f, 7.61092553601742E+01f, 9.05096679918781E+01f, 1.07634741152475E+02f, 1.28000000000000E+02f, 1.52218510720348E+02f,
             1.81019335983756E+02f, 2.15269482304951E+02f, 2.56000000000000E+02f, 3.04437021440696E+02f, 3.62038671967512E+02f, 4.30538964609902E+02f, 5.12000000000000E+02f, 6.08874042881393E+02f,
             7.24077343935025E+02f, 8.61077929219803E+02f, 1.02400000000000E+03f, 1.21774808576279E+03f, 1.44815468787005E+03f, 1.72215585843961E+03f, 2.04800000000000E+03f, 2.43549617152557E+03f,
-        };
-
-        #endregion
+        ];
 
         void ReadSideInfo(IMpegFrame frame)
         {
@@ -431,71 +421,63 @@ namespace XLayer.Decoder
             }
         }
 
-        #endregion
-
-        #region Precalc Table Prep
-
-        #region Variables
-
         int[] _sfBandIndexL, _sfBandIndexS;
 
         // these are byte[] to save memory
-        byte[] _cbLookupL = new byte[SSLIMIT * SBLIMIT], _cbLookupS = new byte[SSLIMIT * SBLIMIT], _cbwLookupS = new byte[SSLIMIT * SBLIMIT];
+        readonly byte[] _cbLookupL = new byte[SSLIMIT * SBLIMIT], _cbLookupS = new byte[SSLIMIT * SBLIMIT], _cbwLookupS = new byte[SSLIMIT * SBLIMIT];
         int _cbLookupSR;
 
-        static readonly int[][] _sfBandIndexLTable = {
+        static readonly int[][] _sfBandIndexLTable = [
                                                          // MPEG 1
                                                          // 44.1 kHz
-                                                         new int[] { 0, 4, 8, 12, 16, 20, 24, 30, 36, 44, 52, 62, 74, 90, 110, 134, 162, 196, 238, 288, 342, 418, 576 },
+                                                         [0, 4, 8, 12, 16, 20, 24, 30, 36, 44, 52, 62, 74, 90, 110, 134, 162, 196, 238, 288, 342, 418, 576],
                                                          // 48 kHz
-                                                         new int[] { 0, 4, 8, 12, 16, 20, 24, 30, 36, 42, 50, 60, 72, 88, 106, 128, 156, 190, 230, 276, 330, 384, 576 },
+                                                         [0, 4, 8, 12, 16, 20, 24, 30, 36, 42, 50, 60, 72, 88, 106, 128, 156, 190, 230, 276, 330, 384, 576],
                                                          // 32 kHz
-                                                         new int[] { 0, 4, 8, 12, 16, 20, 24, 30, 36, 44, 54, 66, 82, 102, 126, 156, 194, 240, 296, 364, 448, 550, 576 },
+                                                         [0, 4, 8, 12, 16, 20, 24, 30, 36, 44, 54, 66, 82, 102, 126, 156, 194, 240, 296, 364, 448, 550, 576],
 
                                                          // MPEG 2
                                                          // 22.05 kHz
-                                                         new int[] { 0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576 },
+                                                         [0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576],
                                                          // 24 kHz
-                                                         new int[] { 0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 114, 136, 162, 194, 232, 278, 330, 394, 464, 540, 576 },
+                                                         [0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 114, 136, 162, 194, 232, 278, 330, 394, 464, 540, 576],
                                                          // 16 kHz
-                                                         new int[] { 0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576 },
+                                                         [0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576],
 
                                                          // MPEG 2.5
                                                          // 11.025 kHz
-                                                         new int[] { 0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576 },
+                                                         [0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576],
                                                          // 12 kHz
-                                                         new int[] { 0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576 },
+                                                         [0, 6, 12, 18, 24, 30, 36, 44, 54, 66, 80, 96, 116, 140, 168, 200, 238, 284, 336, 396, 464, 522, 576],
                                                          // 8 kHz
-                                                         new int[] { 0, 12, 24, 36, 48, 60, 72, 88, 108, 132, 160, 192, 232, 280, 336, 400, 476, 566, 568, 570, 572, 574, 576 },
-                                                     };
+                                                         [0, 12, 24, 36, 48, 60, 72, 88, 108, 132, 160, 192, 232, 280, 336, 400, 476, 566, 568, 570, 572, 574, 576],
+                                                     ];
 
-        static readonly int[][] _sfBandIndexSTable = {
+        static readonly int[][] _sfBandIndexSTable = [
                                                          // MPEG 1
                                                          // 44.1 kHz
-                                                         new int[] { 0, 4, 8, 12, 16, 22, 30, 40, 52, 66, 84, 106, 136, 192 },
+                                                         [0, 4, 8, 12, 16, 22, 30, 40, 52, 66, 84, 106, 136, 192],
                                                          // 48 kHz
-                                                         new int[] { 0, 4, 8, 12, 16, 22, 28, 38, 50, 64, 80, 100, 126, 192 },
+                                                         [0, 4, 8, 12, 16, 22, 28, 38, 50, 64, 80, 100, 126, 192],
                                                          // 32 kHz
-                                                         new int[] { 0, 4, 8, 12, 16, 22, 30, 42, 58, 78, 104, 138, 180, 192 },
+                                                         [0, 4, 8, 12, 16, 22, 30, 42, 58, 78, 104, 138, 180, 192],
 
                                                          // MPEG 2
                                                          // 22.05 kHz
-                                                         new int[] { 0, 4, 8, 12, 18, 24, 32, 42, 56, 74, 100, 132, 174, 192 },
+                                                         [0, 4, 8, 12, 18, 24, 32, 42, 56, 74, 100, 132, 174, 192],
                                                          // 24 kHz
-                                                         new int[] { 0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 136, 180, 192 },
+                                                         [0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 136, 180, 192],
                                                          // 16 kHz
-                                                         new int[] { 0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 134, 174, 192 },
+                                                         [0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 134, 174, 192],
 
                                                          // MPEG 2.5
                                                          // 11.025 kHz
-                                                         new int[] { 0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 134, 174, 192 },
+                                                         [0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 134, 174, 192],
                                                          // 12 kHz
-                                                         new int[] { 0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 134, 174, 192 },
+                                                         [0, 4, 8, 12, 18, 26, 36, 48, 62, 80, 104, 134, 174, 192],
                                                          // 8 kHz
-                                                         new int[] { 0, 8, 16, 24, 36, 52, 72, 96, 124, 160, 162, 164, 166, 192 },
-                                                     };
-
-        #endregion
+                                                         [0, 8, 16, 24, 36, 52, 72, 96, 124, 160, 162, 164, 166, 192],
+                                                     ];
 
         void PrepTables(IMpegFrame frame)
         {
@@ -580,32 +562,24 @@ namespace XLayer.Decoder
             }
         }
 
-        #endregion
+        readonly int[][][] _scalefac = [   // ch, window, cb
+                                  [new int[13], new int[13], new int[13], new int[23]],
+                                  [new int[13], new int[13], new int[13], new int[23]]
+                              ];
 
-        #region Scale Factors
+        static readonly int[][] _slen = [
+                                            [0, 0, 0, 0, 3, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4],
+                                            [0, 1, 2, 3, 0, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 3]
+                                        ];
 
-        #region Variables
-
-        int[][][] _scalefac = {   // ch, window, cb
-                                  new int[][] { new int[13], new int[13], new int[13], new int[23] },
-                                  new int[][] { new int[13], new int[13], new int[13], new int[23] }
-                              };
-
-        static readonly int[][] _slen = {
-                                            new int[] { 0, 0, 0, 0, 3, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4 },
-                                            new int[] { 0, 1, 2, 3, 0, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 3 }
-                                        };
-
-        static readonly int[][][] _sfbBlockCntTab = {
-                                                        new int[][] { new int[] { 6, 5, 5, 5 },   new int[] { 9, 9, 9, 9 },    new int[] { 6, 9, 9, 9 }   },
-                                                        new int[][] { new int[] { 6, 5, 7, 3 },   new int[] { 9, 9, 12, 6 },   new int[] { 6, 9, 12, 6 }  },
-                                                        new int[][] { new int[] { 11, 10, 0, 0 }, new int[] { 18, 18, 0, 0 },  new int[] { 15, 18, 0, 0 } },
-                                                        new int[][] { new int[] { 7, 7, 7, 0 },   new int[] { 12, 12, 12, 0 }, new int[] { 6, 15, 12, 0 } },
-                                                        new int[][] { new int[] { 6, 6, 6, 3 },   new int[] { 12, 9, 9, 6 },   new int[] { 6, 12, 9, 6 }  },
-                                                        new int[][] { new int[] { 8, 8, 5, 0 },   new int[] { 15, 12, 9, 0 },  new int[] { 6, 18, 9, 0 }  },
-                                                    };
-
-        #endregion
+        static readonly int[][][] _sfbBlockCntTab = [
+                                                        [[6, 5, 5, 5],   [9, 9, 9, 9],    [6, 9, 9, 9]],
+                                                        [[6, 5, 7, 3],   [9, 9, 12, 6],   [6, 9, 12, 6]],
+                                                        [[11, 10, 0, 0], [18, 18, 0, 0],  [15, 18, 0, 0]],
+                                                        [[7, 7, 7, 0],   [12, 12, 12, 0], [6, 15, 12, 0]],
+                                                        [[6, 6, 6, 3],   [12, 9, 9, 6],   [6, 12, 9, 6]],
+                                                        [[8, 8, 5, 0],   [15, 12, 9, 0],  [6, 18, 9, 0]],
+                                                    ];
 
         int ReadScalefactors(int gr, int ch)
         {
@@ -892,18 +866,12 @@ namespace XLayer.Decoder
             return slen[0] * blkCnt[0] + slen[1] * blkCnt[1] + slen[2] * blkCnt[2] + slen[3] * blkCnt[3];
         }
 
-        #endregion
+        readonly float[][] _samples = [new float[SSLIMIT * SBLIMIT + 3], new float[SSLIMIT * SBLIMIT + 3]];
 
-        #region Huffman & Dequantize
-
-        #region Variables
-
-        float[][] _samples = { new float[SSLIMIT * SBLIMIT + 3], new float[SSLIMIT * SBLIMIT + 3] };
-
-        static readonly int[] PRETAB = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 3, 2, 0 };
+        static readonly int[] PRETAB = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 3, 2, 0];
 
         static readonly float[] POW2_TAB =
-        {
+        [
             1.000000000000000E-00f, 7.071067811865470E-01f, 5.000000000000000E-01f, 3.535533905932740E-01f, 2.500000000000000E-01f, 1.767766952966370E-01f, 1.250000000000000E-01f, 8.838834764831840E-02f,
             6.250000000000000E-02f, 4.419417382415920E-02f, 3.125000000000000E-02f, 2.209708691207960E-02f, 1.562500000000000E-02f, 1.104854345603980E-02f, 7.812500000000000E-03f, 5.524271728019900E-03f,
             3.906250000000000E-03f, 2.762135864009950E-03f, 1.953125000000000E-03f, 1.381067932004980E-03f, 9.765625000000000E-04f, 6.905339660024880E-04f, 4.882812500000000E-04f, 3.452669830012440E-04f,
@@ -912,9 +880,7 @@ namespace XLayer.Decoder
             9.536743164062500E-07f, 6.743495761743050E-07f, 4.768371582031250E-07f, 3.371747880871520E-07f, 2.384185791015620E-07f, 1.685873940435760E-07f, 1.192092895507810E-07f, 8.429369702178800E-08f,
             5.960464477539060E-08f, 4.214684851089410E-08f, 2.980232238769530E-08f, 2.107342425544710E-08f, 1.490116119384770E-08f, 1.053671212772350E-08f, 7.450580596923830E-09f, 5.268356063861760E-09f,
             3.725290298461910E-09f, 2.634178031930880E-09f, 1.862645149230960E-09f, 1.317089015965440E-09f, 9.313225746154790E-10f, 6.585445079827190E-10f, 4.656612873077390E-10f, 3.292722539913600E-10f,
-        };
-
-        #endregion
+        ];
 
         void ReadSamples(int sfBits, int gr, int ch)
         {
@@ -961,11 +927,10 @@ namespace XLayer.Decoder
             // count1 section
             h = _count1TableSelect[gr][ch] + 32;
 
-            float v, w;
             // - 3 to ensure that we never get an out of range exception
             while (part3end > _bitRes.BitsRead && idx < SBLIMIT * SSLIMIT - 3)
             {
-                Huffman.Decode(_bitRes, h, out x, out y, out v, out w);
+                Huffman.Decode(_bitRes, h, out x, out y, out float v, out float w);
                 _samples[ch][idx] = Dequantize(idx, v, gr, ch); ++idx;
                 _samples[ch][idx] = Dequantize(idx, w, gr, ch); ++idx;
                 _samples[ch][idx] = Dequantize(idx, x, gr, ch); ++idx;
@@ -1019,31 +984,22 @@ namespace XLayer.Decoder
             return 0f;
         }
 
-        #endregion
+        static readonly float[][] _isRatio = [
+                                                 [0f, 0.211324865405187f, 0.366025403784439f, 0.5f, 0.633974596215561f, 0.788675134594813f, 1f],
+                                                 [1f, 0.788675134594813f, 0.633974596215561f, 0.5f, 0.366025403784439f, 0.211324865405187f, 0f]
+                                             ];
 
-        #region Stereo
+        static readonly float[][][] _lsfRatio = [   // sfc%2, ch, isPos
+                                                    [
+                                                        [1f, 0.840896415256f, 1f, 0.707106781190391f, 1f, 0.594603557506209f, 1f, 0.500000000005436f, 1f, 0.420448207632571f, 1f, 0.353553390599039f, 1f, 0.297301778756337f, 1f, 0.250000000005436f, 1f, 0.210224103818571f, 1f, 0.176776695301441f, 1f, 0.148650889379784f, 1f, 0.125000000004077f, 1f, 0.105112051910428f, 1f, 0.0883883476516816f, 1f, 0.0743254446907002f, 1f, 0.0625000000027179f],
+                                                        [1f, 1f, 0.840896415256f, 1f, 0.707106781190391f, 1f, 0.594603557506209f, 1f, 0.500000000005436f, 1f, 0.420448207632571f, 1f, 0.353553390599039f, 1f, 0.297301778756337f, 1f, 0.250000000005436f, 1f, 0.210224103818571f, 1f, 0.176776695301441f, 1f, 0.148650889379784f, 1f, 0.125000000004077f, 1f, 0.105112051910428f, 1f, 0.0883883476516816f, 1f, 0.0743254446907002f, 1f],
+                                                    ],
+                                                    [
+                                                        [1f, 0.707106781188f, 1f, 0.500000000002054f, 1f, 0.353553390595452f, 1f, 0.250000000002054f, 1f, 0.176776695298452f, 1f, 0.125000000001541f, 1f, 0.0883883476495893f, 1f, 0.062500000001027f, 1f, 0.0441941738249762f, 1f, 0.0312500000006419f, 1f, 0.0220970869125789f, 1f, 0.0156250000003851f, 1f, 0.0110485434563348f, 1f, 0.00781250000022466f, 1f, 0.00552427172819011f, 1f, 0.00390625000012838f],
+                                                        [1f, 1f, 0.707106781188f, 1f, 0.500000000002054f, 1f, 0.353553390595452f, 1f, 0.250000000002054f, 1f, 0.176776695298452f, 1f, 0.125000000001541f, 1f, 0.0883883476495893f, 1f, 0.062500000001027f, 1f, 0.0441941738249762f, 1f, 0.0312500000006419f, 1f, 0.0220970869125789f, 1f, 0.0156250000003851f, 1f, 0.0110485434563348f, 1f, 0.00781250000022466f, 1f, 0.00552427172819011f, 1f],
+                                                    ],
+                                                ];
 
-        #region Variables
-
-        static readonly float[][] _isRatio = {
-                                                 new float[] { 0f, 0.211324865405187f, 0.366025403784439f, 0.5f, 0.633974596215561f, 0.788675134594813f, 1f },
-                                                 new float[] { 1f, 0.788675134594813f, 0.633974596215561f, 0.5f, 0.366025403784439f, 0.211324865405187f, 0f }
-                                             };
-
-        static readonly float[][][] _lsfRatio = {   // sfc%2, ch, isPos
-                                                    new float[][]
-                                                    {
-                                                        new float[] { 1f, 0.840896415256f, 1f, 0.707106781190391f, 1f, 0.594603557506209f, 1f, 0.500000000005436f, 1f, 0.420448207632571f, 1f, 0.353553390599039f, 1f, 0.297301778756337f, 1f, 0.250000000005436f, 1f, 0.210224103818571f, 1f, 0.176776695301441f, 1f, 0.148650889379784f, 1f, 0.125000000004077f, 1f, 0.105112051910428f, 1f, 0.0883883476516816f, 1f, 0.0743254446907002f, 1f, 0.0625000000027179f },
-                                                        new float[] { 1f, 1f, 0.840896415256f, 1f, 0.707106781190391f, 1f, 0.594603557506209f, 1f, 0.500000000005436f, 1f, 0.420448207632571f, 1f, 0.353553390599039f, 1f, 0.297301778756337f, 1f, 0.250000000005436f, 1f, 0.210224103818571f, 1f, 0.176776695301441f, 1f, 0.148650889379784f, 1f, 0.125000000004077f, 1f, 0.105112051910428f, 1f, 0.0883883476516816f, 1f, 0.0743254446907002f, 1f },
-                                                    },
-                                                    new float[][]
-                                                    {
-                                                        new float[] { 1f, 0.707106781188f, 1f, 0.500000000002054f, 1f, 0.353553390595452f, 1f, 0.250000000002054f, 1f, 0.176776695298452f, 1f, 0.125000000001541f, 1f, 0.0883883476495893f, 1f, 0.062500000001027f, 1f, 0.0441941738249762f, 1f, 0.0312500000006419f, 1f, 0.0220970869125789f, 1f, 0.0156250000003851f, 1f, 0.0110485434563348f, 1f, 0.00781250000022466f, 1f, 0.00552427172819011f, 1f, 0.00390625000012838f },
-                                                        new float[] { 1f, 1f, 0.707106781188f, 1f, 0.500000000002054f, 1f, 0.353553390595452f, 1f, 0.250000000002054f, 1f, 0.176776695298452f, 1f, 0.125000000001541f, 1f, 0.0883883476495893f, 1f, 0.062500000001027f, 1f, 0.0441941738249762f, 1f, 0.0312500000006419f, 1f, 0.0220970869125789f, 1f, 0.0156250000003851f, 1f, 0.0110485434563348f, 1f, 0.00781250000022466f, 1f, 0.00552427172819011f, 1f },
-                                                    },
-                                                };
-
-        #endregion
 
         void Stereo(MpegChannelMode channelMode, int chanModeExt, int gr, bool lsf)
         {
@@ -1059,7 +1015,6 @@ namespace XLayer.Decoder
                 {
                     // do the intensity stereo processing
 
-                    #region Common Processing
 
                     // find the highest sample index with a value in channel 1
                     //   - now each step only has to start from there
@@ -1097,10 +1052,6 @@ namespace XLayer.Decoder
                         // 0 through 21 of long
                         lEnd = 21;
                     }
-
-                    #endregion
-
-                    #region Long Processing
 
                     // long processing is far simpler than short...  just process from the start of the scalefactor band after the last non-zero sample
                     // we also don't have to mess with "finding" again; it was done above
@@ -1174,10 +1125,6 @@ namespace XLayer.Decoder
                             ApplyIStereo(_sfBandIndexL[21], 576 - _sfBandIndexL[21], isPos);
                         }
                     }
-
-                    #endregion
-
-                    #region Short Processing
 
                     // short processing requires that each window be looked at separately... they are interleaved, so it gets really interesting...
                     // on the plus side, whichever window the {lastValueIdx} is in is already found... :)
@@ -1299,8 +1246,6 @@ namespace XLayer.Decoder
                             }
                         }
                     }
-
-                    #endregion
                 }
                 else if (midSide)
                 {
@@ -1396,15 +1341,7 @@ namespace XLayer.Decoder
             }
         }
 
-        #endregion
-
-        #region Reorder
-
-        #region Variables
-
-        float[] _reorderBuf = new float[SBLIMIT * SSLIMIT];
-
-        #endregion
+        readonly float[] _reorderBuf = new float[SBLIMIT * SSLIMIT];
 
         void Reorder(float[] buf, bool mixedBlock)
         {
@@ -1440,25 +1377,17 @@ namespace XLayer.Decoder
             Array.Copy(_reorderBuf, buf, SSLIMIT * SBLIMIT);
         }
 
-        #endregion
-
-        #region Anti-Alias
-
-        #region Variables
-
-        static readonly float[] _scs = {
+        static readonly float[] _scs = [
                                         0.85749292571254400f,  0.88174199731770500f,  0.94962864910273300f,  0.98331459249179000f,
                                         0.99551781606758600f,  0.99916055817814800f,  0.99989919524444700f,  0.99999315507028000f,
-                                       };
+                                       ];
 
-        static readonly float[] _sca = {
+        static readonly float[] _sca = [
                                        -0.51449575542752700f, -0.47173196856497200f, -0.31337745420390200f, -0.18191319961098100f,
                                        -0.09457419252642070f, -0.04096558288530410f, -0.01419856857247120f, -0.00369997467376004f,
-                                       };
+                                       ];
 
-        #endregion
-
-        void AntiAlias(float[] buf, bool mixedBlock)
+        static void AntiAlias(float[] buf, bool mixedBlock)
         {
             int sblim;
             if (mixedBlock)
@@ -1482,11 +1411,7 @@ namespace XLayer.Decoder
             }
         }
 
-        #endregion
-
-        #region Frequency Inversion
-
-        void FrequencyInversion(float[] buf)
+        static void FrequencyInversion(float[] buf)
         {
             for (int ss = 1; ss < SSLIMIT; ss += 2)
             {
@@ -1497,15 +1422,7 @@ namespace XLayer.Decoder
             }
         }
 
-        #endregion
-
-        #region Inverse Polyphase
-
-        #region Variables
-
-        float[] _polyPhase = new float[SBLIMIT];
-
-        #endregion
+        readonly float[] _polyPhase = new float[SBLIMIT];
 
         // Layer III interleaves the samples, so we have to make them linear again
         void InversePolyphase(float[] buf, int ch, int ofs, float[] outBuf)
@@ -1521,7 +1438,5 @@ namespace XLayer.Decoder
                 Array.Copy(_polyPhase, 0, outBuf, ofs, SBLIMIT);
             }
         }
-
-        #endregion
     }
 }

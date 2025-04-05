@@ -67,38 +67,36 @@ namespace XLayer.Decoder
             return true;
         }
 
-        #region Lookup Tables
-
         // this is from the formula: C = 1 / (1 / (1 << (Bits / 2 + Bits % 2 - 1)) + .5f)
         // index by real bits (Bits / 2 + Bits % 2 - 1)
-        static readonly float[] _groupedC = { 0, 0, 1.33333333333f, 1.60000000000f, 1.77777777777f };
+        static readonly float[] _groupedC = [0, 0, 1.33333333333f, 1.60000000000f, 1.77777777777f];
 
         // these are always -0.5
         // index by real bits (Bits / 2 + Bits % 2 - 1)
-        static readonly float[] _groupedD = { 0, 0, -0.5f, -0.5f, -0.5f };
+        static readonly float[] _groupedD = [0, 0, -0.5f, -0.5f, -0.5f];
 
         // this is from the formula: 1 / (1 - (1f / (1 << Bits)))
         // index by bits
-        static readonly float[] _C = {
+        static readonly float[] _C = [
                                          0.00000000000f,
                                          0.00000000000f, 1.33333333333f, 1.14285714286f, 1.06666666666f, 1.03225806452f, 1.01587301587f, 1.00787401575f, 1.00392156863f,
                                          1.00195694716f, 1.00097751711f, 1.00048851979f, 1.00024420024f, 1.00012208522f, 1.00006103888f, 1.00003051851f, 1.00001525902f
-                                     };
+                                     ];
 
         // this is from the formula: 1f / (1 << Bits - 1) - 1
         // index by bits
-        static readonly float[] _D = {
+        static readonly float[] _D = [
                                          0.00000000000f - 0f,
                                          0.00000000000f - 0f, 0.50000000000f - 1f, 0.25000000000f - 1f, 0.12500000000f - 1f, 0.062500000000f - 1f, 0.03125000000f - 1f, 0.01562500000f - 1f, 0.00781250000f - 1f,
                                          0.00390625000f - 1f, 0.00195312500f - 1f, 0.00097656250f - 1f, 0.00048828125f - 1f, 0.000244140630f - 1f, 0.00012207031f - 1f, 0.00006103516f - 1f, 0.00003051758f - 1f
-                                     };
+                                     ];
 
         // this is from a (really annoying) formula:
         //   x = Math.Pow(4, 1 / ((2 << (idx % 3) + 1) - (idx % 3))) / (1 << (idx / 3))
         // Basically...
         //   [0] = Math.Pow(4, 1 / 2), [1] = Math.Pow(4, 1 / 3), [2] = Math.Pow(4, 1 / 6)
         //   For every remaining element, calculate (in order): [idx] = [idx - 3] / 2
-        static readonly float[] _denormalMultiplier = {
+        static readonly float[] _denormalMultiplier = [
                                                           2.00000000000000f, 1.58740105196820f, 1.25992104989487f, 1.00000000000000f, 0.79370052598410f, 0.62996052494744f, 0.50000000000000f, 0.39685026299205f,
                                                           0.31498026247372f, 0.25000000000000f, 0.19842513149602f, 0.15749013123686f, 0.12500000000000f, 0.09921256574801f, 0.07874506561843f, 0.06250000000000f,
                                                           0.04960628287401f, 0.03937253280921f, 0.03125000000000f, 0.02480314143700f, 0.01968626640461f, 0.01562500000000f, 0.01240157071850f, 0.00984313320230f,
@@ -107,16 +105,16 @@ namespace XLayer.Decoder
                                                           0.00019377454248f, 0.00015379895629f, 0.00012207031250f, 0.00009688727124f, 0.00007689947814f, 0.00006103515625f, 0.00004844363562f, 0.00003844973907f,
                                                           0.00003051757813f, 0.00002422181781f, 0.00001922486954f, 0.00001525878906f, 0.00001211090890f, 0.00000961243477f, 0.00000762939453f, 0.00000605545445f,
                                                           0.00000480621738f, 0.00000381469727f, 0.00000302772723f, 0.00000240310869f, 0.00000190734863f, 0.00000151386361f, 0.00000120155435f, 0.00000095367432f
-                                                      };
+                                                      ];
 
-        #endregion
+        private int _channels;
+        private int _jsbound;
+        private readonly int _granuleCount;
+        readonly int[][] _allocLookupTable, _scfsi, _samples;
+        readonly int[][][] _scalefac;
+        readonly float[] _polyPhaseBuf;
 
-        int _channels, _jsbound, _granuleCount;
-        int[][] _allocLookupTable, _scfsi, _samples;
-        int[][][] _scalefac;
-        float[] _polyPhaseBuf;
-
-        int[][] _allocation;
+        readonly int[][] _allocation;
 
         protected LayerIIDecoderBase(int[][] allocLookupTable, int granuleCount)
             : base()
@@ -124,12 +122,12 @@ namespace XLayer.Decoder
             _allocLookupTable = allocLookupTable;
             _granuleCount = granuleCount;
 
-            _allocation = new int[][] { new int[SBLIMIT], new int[SBLIMIT] };
-            _scfsi = new int[][] { new int[SBLIMIT], new int[SBLIMIT] };
-            _samples = new int[][] { new int[SBLIMIT * SSLIMIT * _granuleCount], new int[SBLIMIT * SSLIMIT * _granuleCount] };
+            _allocation = [new int[SBLIMIT], new int[SBLIMIT]];
+            _scfsi = [new int[SBLIMIT], new int[SBLIMIT]];
+            _samples = [new int[SBLIMIT * SSLIMIT * _granuleCount], new int[SBLIMIT * SSLIMIT * _granuleCount]];
 
             // NB: ReadScaleFactors(...) requires all three granules, even in Layer I
-            _scalefac = new int[][][] { new int[3][], new int[3][] };
+            _scalefac = [new int[3][], new int[3][]];
             for (int i = 0; i < 3; i++)
             {
                 _scalefac[0][i] = new int[SBLIMIT];

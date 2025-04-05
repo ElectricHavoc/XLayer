@@ -40,9 +40,7 @@ namespace XLayer.Decoder
 
         const float INV_SQRT_2 = 7.071067811865474617150084668537e-01f;
 
-        #region Tables
-
-        static float[] DEWINDOW_TABLE = {
+        static readonly float[] DEWINDOW_TABLE = [
                                          0.000000000f, -0.000015259f, -0.000015259f, -0.000015259f,
                                         -0.000015259f, -0.000015259f, -0.000015259f, -0.000030518f,
                                         -0.000030518f, -0.000030518f, -0.000030518f, -0.000045776f,
@@ -171,9 +169,9 @@ namespace XLayer.Decoder
                                          0.000045776f,  0.000045776f,  0.000030518f,  0.000030518f,
                                          0.000030518f,  0.000030518f,  0.000015259f,  0.000015259f,
                                          0.000015259f,  0.000015259f,  0.000015259f,  0.000015259f
-                                        };
+                                        ];
 
-        static float[] SYNTH_COS64_TABLE = {
+        static readonly float[] SYNTH_COS64_TABLE = [
                                            5.0060299823519627260e-01f, 5.0241928618815567820e-01f, 5.0547095989754364798e-01f, 5.0979557910415917998e-01f,
                                            5.1544730992262455249e-01f, 5.2249861493968885462e-01f, 5.3104259108978413284e-01f, 5.4119610014619701222e-01f,
                                            5.5310389603444454210e-01f, 5.6694403481635768927e-01f, 5.8293496820613388554e-01f, 6.0134488693504528634e-01f,
@@ -182,12 +180,10 @@ namespace XLayer.Decoder
                                            9.7256823786196078263e-01f, 1.0606776859903470633e+00f, 1.1694399334328846596e+00f, 1.3065629648763763537e+00f,
                                            1.4841646163141661852e+00f, 1.7224470982383341955e+00f, 2.0577810099534108446e+00f, 2.5629154477415054814e+00f,
                                            3.4076084184687189804e+00f, 5.1011486186891552563e+00f, 1.0190008123548032870e+01f
-                                           };
+                                           ];
 
-        #endregion
-
-        List<float[]> _synBuf = new List<float[]>(2);
-        List<int> _bufOffset = new List<int>(2);
+        readonly List<float[]> _synBuf = new(2);
+        readonly List<int> _bufOffset = new(2);
 
         float[] _eq;
 
@@ -214,13 +210,11 @@ namespace XLayer.Decoder
             _bufOffset.Clear();
         }
 
-        float[] ippuv = new float[512];
+        readonly float[] ippuv = new float[512];
 
         protected void InversePolyPhase(int channel, float[] data)
         {
-            float[] synBuf;
-            int k;
-            GetBufAndOffset(channel, out synBuf, out k);
+            GetBufAndOffset(channel, out float[] synBuf, out int k);
 
             if (_eq != null)
             {
@@ -256,7 +250,7 @@ namespace XLayer.Decoder
             _bufOffset[channel] = k;
         }
 
-        float[] ei32 = new float[16], eo32 = new float[16], oi32 = new float[16], oo32 = new float[16];
+        readonly float[] ei32 = new float[16], eo32 = new float[16], oi32 = new float[16], oo32 = new float[16];
 
         void DCT32(float[] _in, float[] _out, int k)
         {
@@ -280,7 +274,7 @@ namespace XLayer.Decoder
             _out[31 + k] = oo32[15];
         }
 
-        float[] ei16 = new float[8], eo16 = new float[8], oi16 = new float[8], oo16 = new float[8];
+        readonly float[] ei16 = new float[8], eo16 = new float[8], oi16 = new float[8], oo16 = new float[8];
 
         void DCT16(float[] _in, float[] _out)
         {
@@ -332,7 +326,7 @@ namespace XLayer.Decoder
             _out[15] = oo16[7];
         }
 
-        float[] ei8 = new float[4], tmp8 = new float[6], oi8 = new float[4], oo8 = new float[4];
+        readonly float[] ei8 = new float[4], tmp8 = new float[6], oi8 = new float[4], oo8 = new float[4];
 
         void DCT8(float[] _in, float[] _out)
         {
@@ -377,7 +371,7 @@ namespace XLayer.Decoder
             _out[7] = oo8[3];
         }
 
-        void BuildUVec(float[] u_vec, float[] cur_synbuf, int k)
+        static void BuildUVec(float[] u_vec, float[] cur_synbuf, int k)
         {
             int i, j, uvp = 0;
 
@@ -407,7 +401,7 @@ namespace XLayer.Decoder
             }
         }
 
-        void DewindowOutput(float[] u_vec, float[] samples)
+        static void DewindowOutput(float[] u_vec, float[] samples)
         {
             for (int i = 0; i < 512; i++)
             {

@@ -60,7 +60,7 @@ namespace XLayer.Decoder
         {
             if (_savedBuffer != null)
             {
-                if (offset < 0) throw new ArgumentOutOfRangeException();
+                ArgumentOutOfRangeException.ThrowIfNegative(offset);
                 if (offset >= _savedBuffer.Length) return -1;
 
                 return (int)_savedBuffer[offset];

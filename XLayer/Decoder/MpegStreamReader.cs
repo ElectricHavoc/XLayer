@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 
 namespace XLayer.Decoder
 {
@@ -12,10 +13,12 @@ namespace XLayer.Decoder
         MpegFrame _first, _current, _last, _lastFree;
 
         long _readOffset, _eofOffset;
-        Stream _source;
-        bool _canSeek, _endFound, _mixedFrameSize;
-        object _readLock = new object();
-        object _frameLock = new object();
+        readonly Stream _source;
+        private readonly bool _canSeek;
+        private bool _endFound;
+        private bool _mixedFrameSize;
+        readonly object _readLock = new();
+        readonly Lock _frameLock = new();
 
         internal MpegStreamReader(Stream source)
         {
@@ -26,7 +29,7 @@ namespace XLayer.Decoder
 
             // find the first Mpeg frame
             var frame = FindNextFrame();
-            while (frame != null && !(frame is MpegFrame))
+            while (frame != null && frame is not MpegFrame)
             {
                 frame = FindNextFrame();
             }
@@ -38,7 +41,7 @@ namespace XLayer.Decoder
             frame = FindNextFrame();
 
             // if not, it's not a valid file
-            if (frame == null || !(frame is MpegFrame)) throw new InvalidDataException("Not a valid MPEG file!");
+            if (frame == null || frame is not MpegFrame) throw new InvalidDataException("Not a valid MPEG file!");
 
             // seek to the first frame
             _current = _first;
@@ -174,7 +177,7 @@ namespace XLayer.Decoder
                                         else
                                         {
                                             // grrr...  the ID3 2.4 spec says tags can be anywhere in the file and that later tags can override earlier ones...  boo
-                                            _id3Frame.Merge(f);
+                                            ID3Frame.Merge(f);
                                         }
 
                                         _readOffset += f.Length;
@@ -228,7 +231,7 @@ namespace XLayer.Decoder
             public int End;
             public int DiscardCount;
 
-            object _localLock = new object();
+            readonly Lock _localLock = new();
 
             public ReadBuffer(int initialSize)
             {
@@ -242,7 +245,7 @@ namespace XLayer.Decoder
                 lock (_localLock)
                 {
                     var startIdx = EnsureFilled(reader, offset, ref count);
-                    
+
                     Buffer.BlockCopy(Data, startIdx, buffer, index, count);
                 }
                 return count;
@@ -271,8 +274,6 @@ namespace XLayer.Decoder
                 {
                     int readStart = 0, readCount = 0, moveCount = 0;
                     long readOffset = 0;
-
-                    #region Decision-Making
 
                     if (startIdx < 0)
                     {
@@ -359,10 +360,6 @@ namespace XLayer.Decoder
                         }
                     }
 
-                    #endregion
-
-                    #region Buffer Resizing & Data Moving
-
                     if (endIdx - moveCount > Data.Length || readStart + readCount - moveCount > Data.Length)
                     {
                         var newSize = Data.Length * 2;
@@ -414,10 +411,6 @@ namespace XLayer.Decoder
                     startIdx -= moveCount;
                     endIdx -= moveCount;
                     End -= moveCount;
-
-                    #endregion
-
-                    #region Buffer Filling
 
                     lock (reader._readLock)
                     {
@@ -481,8 +474,6 @@ namespace XLayer.Decoder
                             End += temp;
                         }
                     }
-
-                    #endregion
                 }
 
                 return startIdx;
@@ -525,22 +516,22 @@ namespace XLayer.Decoder
             }
         }
 
-        ReadBuffer _readBuf = new ReadBuffer(2048);
+        readonly ReadBuffer _readBuf = new(2048);
 
         internal int Read(long offset, byte[] buffer, int index, int count)
         {
             // make sure the offset is at least positive
-            if (offset < 0L) throw new ArgumentOutOfRangeException("offset");
+            ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0L);
 
             // make sure the buffer is valid
-            if (index < 0 || index + count > buffer.Length) throw new ArgumentOutOfRangeException("index");
+            if (index < 0 || index + count > buffer.Length) throw new ArgumentOutOfRangeException(nameof(index));
 
             return _readBuf.Read(this, offset, buffer, index, count);
         }
 
         internal int ReadByte(long offset)
         {
-            if (offset < 0L) throw new ArgumentOutOfRangeException("offset");
+            ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0L);
 
             return _readBuf.ReadByte(this, offset);
         }

@@ -102,7 +102,7 @@ namespace XLayer.Decoder
             }
         }
 
-        void ParseV1(int offset)
+        static void ParseV1(int offset)
         {
             //var buffer = new byte[125];
             //if (Read(offset, buffer) == 125)
@@ -171,7 +171,7 @@ namespace XLayer.Decoder
             //}
         }
 
-        void ParseV2()
+        static void ParseV2()
         {
             // v2 is much more complicated than v1...  don't worry about it for now
             // look for any merged frames, as well
@@ -197,7 +197,7 @@ namespace XLayer.Decoder
         //public TimeSpan StartTime { get; private set; }
         //public TimeSpan EndTime { get; private set; }
 
-        internal void Merge(ID3Frame newFrame)
+        internal static void Merge(ID3Frame newFrame)
         {
             // just save off the frame for parsing later
         }

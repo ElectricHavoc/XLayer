@@ -7,20 +7,18 @@ namespace XLayer.Decoder
     class MpegFrame : FrameBase, IMpegFrame
     {
         static readonly int[][][] _bitRateTable =
-        {
-            new int[][]
-            {
-                new int[] { 0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448 },
-                new int[] { 0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384 },
-                new int[] { 0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320 }
-            },
-            new int[][]
-            {
-                new int[] { 0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256 },
-                new int[] { 0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160 },
-                new int[] { 0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160 }
-            },
-        };
+        [
+            [
+                [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
+                [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384],
+                [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320]
+            ],
+            [
+                [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256],
+                [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
+                [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160]
+            ],
+        ];
 
         internal static MpegFrame TrySync(uint syncMark)
         {
@@ -276,10 +274,12 @@ namespace XLayer.Decoder
 
         VBRInfo ParseXing(int offset)
         {
-            VBRInfo info = new VBRInfo();
-            info.Channels = Channels;
-            info.SampleRate = SampleRate;
-            info.SampleCount = SampleCount;
+            VBRInfo info = new()
+            {
+                Channels = Channels,
+                SampleRate = SampleRate,
+                SampleCount = SampleCount
+            };
 
             var buf = new byte[100];
             if (Read(offset, buf, 0, 4) != 4) return null;
@@ -346,10 +346,12 @@ namespace XLayer.Decoder
 
         VBRInfo ParseVBRI()
         {
-            VBRInfo info = new VBRInfo();
-            info.Channels = Channels;
-            info.SampleRate = SampleRate;
-            info.SampleCount = SampleCount;
+            VBRInfo info = new()
+            {
+                Channels = Channels,
+                SampleRate = SampleRate,
+                SampleCount = SampleCount
+            };
 
             // VBRI is "fixed" size...  Yay. :)
             var buf = new byte[26];
@@ -393,16 +395,13 @@ namespace XLayer.Decoder
         {
             get
             {
-                switch ((_syncBits >> 19) & 3)
+                return ((_syncBits >> 19) & 3) switch
                 {
-                    case 0:
-                        return MpegVersion.Version25;
-                    case 2:
-                        return MpegVersion.Version2;
-                    case 3:
-                        return MpegVersion.Version1;
-                }
-                return MpegVersion.Unknown;
+                    0 => MpegVersion.Version25,
+                    2 => MpegVersion.Version2,
+                    3 => MpegVersion.Version1,
+                    _ => MpegVersion.Unknown,
+                };
             }
         }
         public MpegLayer Layer
@@ -440,14 +439,13 @@ namespace XLayer.Decoder
         {
             get
             {
-                int sr;
-                switch (SampleRateIndex)
+                var sr = SampleRateIndex switch
                 {
-                    case 0: sr = 44100; break;
-                    case 1: sr = 48000; break;
-                    case 2: sr = 32000; break;
-                    default: sr = 0; break;
-                }
+                    0 => 44100,
+                    1 => 48000,
+                    2 => 32000,
+                    _ => 0,
+                };
                 if (Version > MpegVersion.Version1)
                 {
                     if (Version == MpegVersion.Version25)
@@ -524,16 +522,16 @@ namespace XLayer.Decoder
 
         public int ReadBits(int bitCount)
         {
-            if (bitCount < 1 || bitCount > 32) throw new ArgumentOutOfRangeException("bitCount");
+            if (bitCount < 1 || bitCount > 32) throw new ArgumentOutOfRangeException(nameof(bitCount));
             if (_isMuted) return 0;
 
             while (_bitsRead < bitCount)
             {
                 var b = ReadByte(_readOffset);
                 if (b == -1) throw new System.IO.EndOfStreamException();
-                
+
                 ++_readOffset;
-                
+
                 _bitBucket <<= 8;
                 _bitBucket |= (byte)(b & 0xFF);
                 _bitsRead += 8;
@@ -551,8 +549,8 @@ namespace XLayer.Decoder
             var sb = new StringBuilder("MPEG");
             switch (Version)
             {
-                case MpegVersion.Version1: sb.Append("1"); break;
-                case MpegVersion.Version2: sb.Append("2"); break;
+                case MpegVersion.Version1: sb.Append('1'); break;
+                case MpegVersion.Version2: sb.Append('2'); break;
                 case MpegVersion.Version25: sb.Append("2.5"); break;
             }
 
@@ -560,7 +558,7 @@ namespace XLayer.Decoder
             sb.Append(" Layer ");
             switch (Layer)
             {
-                case MpegLayer.LayerI: sb.Append("I"); break;
+                case MpegLayer.LayerI: sb.Append('I'); break;
                 case MpegLayer.LayerII: sb.Append("II"); break;
                 case MpegLayer.LayerIII: sb.Append("III"); break;
             }

@@ -35,18 +35,18 @@ using System.Collections.Generic;
 
 namespace XLayer.Decoder
 {
-sealed partial class LayerIIIDecoder
+    sealed partial class LayerIIIDecoder
     {
         // This class is based on the Fluendo hybrid logic.
         class HybridMDCT
         {
             const float PI = (float)Math.PI;
 
-            static float[][] _swin;
+            static readonly float[][] _swin;
 
             static HybridMDCT()
             {
-                _swin = new float[][] { new float[36], new float[36], new float[36], new float[36] };
+                _swin = [new float[36], new float[36], new float[36], new float[36]];
 
                 int i;
 
@@ -81,9 +81,7 @@ sealed partial class LayerIIIDecoder
                     _swin[2][i] = 0.0f;
             }
 
-            #region Tables
-
-            static float[] icos72_table = {
+            static readonly float[] icos72_table = [
                                           5.004763425816599609063928255636710673570632934570312500000000e-01f,
                                           5.019099187716736798492433990759309381246566772460937500000000e-01f,
                                           5.043144802900764167574720886477734893560409545898437500000000e-01f,
@@ -119,17 +117,15 @@ sealed partial class LayerIIIDecoder
                                           3.830648787770197127855453800293616950511932373046875000000000e+00f,
                                           5.736856622834929808618653623852878808975219726562500000000000e+00f,
                                           1.146279281302667207853573927422985434532165527343750000000000e+01f
-                                          };
+                                          ];
 
-            #endregion
-
-            List<float[]> _prevBlock;
-            List<float[]> _nextBlock;
+            readonly List<float[]> _prevBlock;
+            readonly List<float[]> _nextBlock;
 
             internal HybridMDCT()
             {
-                _prevBlock = new List<float[]>();
-                _nextBlock = new List<float[]>();
+                _prevBlock = [];
+                _nextBlock = [];
             }
 
             internal void Reset()
@@ -160,8 +156,7 @@ sealed partial class LayerIIIDecoder
             {
                 // get the previous & next blocks so we can overlap correctly
                 //  NB: we swap each pass so we can add the previous block in a single pass
-                float[] prevblck, nextblck;
-                GetPrevBlock(channel, out prevblck, out nextblck);
+                GetPrevBlock(channel, out float[] prevblck, out float[] nextblck);
 
                 // now we have a few options for processing blocks...
                 int start = 0;
@@ -189,8 +184,8 @@ sealed partial class LayerIIIDecoder
                 }
             }
 
-            float[] _imdctTemp = new float[SSLIMIT];
-            float[] _imdctResult = new float[SSLIMIT * 2];
+            readonly float[] _imdctTemp = new float[SSLIMIT];
+            readonly float[] _imdctResult = new float[SSLIMIT * 2];
 
             void LongImpl(float[] fsIn, int sbStart, int sbLimit, float[] nextblck, int blockType)
             {
@@ -458,7 +453,5 @@ sealed partial class LayerIIIDecoder
                 outvec[11] = -h[2] * _swin[2][11];
             }
         }
-
-        #endregion
     }
 }

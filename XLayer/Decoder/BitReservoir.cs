@@ -7,7 +7,7 @@ namespace XLayer.Decoder
         // Per the spec, the maximum buffer size for layer III is 7680 bits, which is 960 bytes.
         // The only catch is if we're decoding a "free" frame, which could be a lot more (since
         //  some encoders allow higher bitrates to maintain audio transparency).
-        byte[] _buf = new byte[8192];
+        readonly byte[] _buf = new byte[8192];
         int _start = 0, _end = -1, _bitsLeft = 0;
         long _bitsRead = 0L;
 
@@ -62,8 +62,7 @@ namespace XLayer.Decoder
 
         public int GetBits(int count)
         {
-            int bitsRead;
-            var bits = TryPeekBits(count, out bitsRead);
+            var bits = TryPeekBits(count, out int bitsRead);
             if (bitsRead < count) throw new System.IO.InvalidDataException("Reservoir did not have enough bytes!");
 
             SkipBits(count);
@@ -90,7 +89,7 @@ namespace XLayer.Decoder
 
         public int TryPeekBits(int count, out int readCount)
         {
-            if (count < 0 || count > 32) throw new ArgumentOutOfRangeException("count", "Must return between 0 and 32 bits!");
+            if (count < 0 || count > 32) throw new ArgumentOutOfRangeException(nameof(count), "Must return between 0 and 32 bits!");
 
             // if we don't have any bits left, just return no bits read
             if (_bitsLeft == 0 || count == 0)
@@ -165,7 +164,7 @@ namespace XLayer.Decoder
             if (count > 0)
             {
                 // make sure we have enough bits to skip
-                if (count > BitsAvailable) throw new ArgumentOutOfRangeException("count");
+                ArgumentOutOfRangeException.ThrowIfGreaterThan(count, BitsAvailable);
 
                 // now calculate the new positions
                 var offset = (8 - _bitsLeft) + count;
