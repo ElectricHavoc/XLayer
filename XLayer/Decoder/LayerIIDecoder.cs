@@ -1,11 +1,11 @@
 ﻿/*
- * NLayer - A C# MPEG1/2/2.5 audio decoder
+ * XLayer - A C# MPEG1/2/2.5 audio decoder
  * 
  */
 
 using System;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     // there's not much we have to do here... table selection, granule count, scalefactor selection
     class LayerIIDecoder : LayerIIDecoderBase

@@ -1,4 +1,4 @@
-﻿namespace NLayer
+﻿namespace XLayer
 {
     /// <summary>
     /// Defines a standard way of representing a MPEG frame to the decoder

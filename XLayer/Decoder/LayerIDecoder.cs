@@ -1,11 +1,11 @@
 ﻿/*
- * NLayer - A C# MPEG1/2/2.5 audio decoder
+ * XLayer - A C# MPEG1/2/2.5 audio decoder
  * 
  */
 
 using System;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     // Layer I is really just a special case of Layer II...  1 granule, 4 allocation bits per subband, 1 scalefactor per active subband, no grouping
     // That (of course) means we literally have no logic here

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     class Huffman
     {

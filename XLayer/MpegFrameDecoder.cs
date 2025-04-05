@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NLayer
+namespace XLayer
 {
     public class MpegFrameDecoder
     {
@@ -77,14 +77,14 @@ namespace NLayer
         /// Result varies with different <see cref="StereoMode"/>:
         /// <list type="bullet">
         /// <item>
-        /// <description>For <see cref="NLayer.StereoMode.Both"/>, sample data on both two channels will occur in turn (left first).</description>
+        /// <description>For <see cref="XLayer.StereoMode.Both"/>, sample data on both two channels will occur in turn (left first).</description>
         /// </item>
         /// <item>
-        /// <description>For <see cref="NLayer.StereoMode.LeftOnly"/> and <see cref="NLayer.StereoMode.RightOnly"/>, only data on
+        /// <description>For <see cref="XLayer.StereoMode.LeftOnly"/> and <see cref="XLayer.StereoMode.RightOnly"/>, only data on
         /// specified channel will occur.</description>
         /// </item>
         /// <item>
-        /// <description>For <see cref="NLayer.StereoMode.DownmixToMono"/>, two channels will be down-mixed into single channel.</description>
+        /// <description>For <see cref="XLayer.StereoMode.DownmixToMono"/>, two channels will be down-mixed into single channel.</description>
         /// </item>
         /// </list>
         /// </summary>

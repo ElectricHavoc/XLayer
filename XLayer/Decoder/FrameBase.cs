@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     abstract class FrameBase
     {

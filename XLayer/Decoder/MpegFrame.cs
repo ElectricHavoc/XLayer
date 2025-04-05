@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     class MpegFrame : FrameBase, IMpegFrame
     {

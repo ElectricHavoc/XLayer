@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     class MpegStreamReader
     {

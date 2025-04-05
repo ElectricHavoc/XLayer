@@ -1,5 +1,5 @@
 ﻿/*
- * NLayer - A C# MPEG1/2/2.5 audio decoder
+ * XLayer - A C# MPEG1/2/2.5 audio decoder
  * 
  * Portions of this file are courtesy Fluendo, S.A.  They are dual licensed as Ms-PL
  * and under the following license:
@@ -32,7 +32,7 @@
 
 using System.Collections.Generic;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     abstract class LayerDecoderBase
     {

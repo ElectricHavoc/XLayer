@@ -1,11 +1,11 @@
 ﻿/*
- * NLayer - A C# MPEG1/2/2.5 audio decoder
+ * XLayer - A C# MPEG1/2/2.5 audio decoder
  * 
  */
 
 using System;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
     // Layers I & II are basically identical...  Layer II adds sample grouping, per subband allocation schemes, and granules
     // Because of this fact, we can use the same decoder for both
@@ -383,7 +383,7 @@ namespace NLayer.Decoder
                 }
             }
 
-            if (_channels == 2 && StereoMode == NLayer.StereoMode.DownmixToMono)
+            if (_channels == 2 && StereoMode == XLayer.StereoMode.DownmixToMono)
             {
                 for (int i = 0; i < idx; i++)
                 {
