@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using BenchmarkDotNet.Running;
 using XLayer.Tests;
 
@@ -59,8 +60,11 @@ if (args.Length > 0 && args[0] == "-p")
     return;
 }
 
-NLayer.MpegFile NLayerMpeg = new("the_toons_recording_contract.mp3");
-XLayer.MpegFile XLayerMpeg = new("the_toons_recording_contract.mp3");
+string path = Path.Combine(Assembly.GetExecutingAssembly().Location, "the_toons_recording_contract.mp3");
+
+
+NLayer.MpegFile NLayerMpeg = new(path);
+XLayer.MpegFile XLayerMpeg = new(path);
 ArgumentOutOfRangeException.ThrowIfNotEqual(NLayerMpeg!.SampleRate, XLayerMpeg!.SampleRate);
 ArgumentOutOfRangeException.ThrowIfNotEqual(NLayerMpeg!.Duration.Seconds, XLayerMpeg!.Duration.Seconds);
 
