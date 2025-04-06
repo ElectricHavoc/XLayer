@@ -25,4 +25,4 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: XLayer.Tests/XLayer.Tests.exe
+      run: dotnet XLayer.Tests\bin\Debug\net9.0\XLayer.Tests.dll 
