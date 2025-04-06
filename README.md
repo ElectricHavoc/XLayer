@@ -1,5 +1,4 @@
 # XLayer
-# XLayer
 
 XLayer is a fully managed MP3 to WAV decoder. 
 
@@ -55,5 +54,4 @@ XLayer.Tests project:
 ## Music 
 Sample music is from my god-father's classic rock band [The Toons](https://www.discogs.com/artist/767082-The-Toons). 
 
-<img src="toons1.png" alt="alt text" width="200" height="200" style="border: 2px solid black; box-shadow: 10px 10px 10px black" /> &nbsp;&nbsp;&nbsp;
-<img src="toons2.png" alt="alt text" width="200" height="200" style="border: 2px solid black; box-shadow: 10px 10px 10px black" />
+![Cover](toons1.png)  ![Band](toons2.png)
