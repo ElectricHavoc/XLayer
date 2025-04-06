@@ -60,8 +60,7 @@ if (args.Length > 0 && args[0] == "-p")
     return;
 }
 
-string path = Path.Combine(Assembly.GetExecutingAssembly().Location, "the_toons_recording_contract.mp3");
-
+string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "the_toons_recording_contract.mp3");
 
 NLayer.MpegFile NLayerMpeg = new(path);
 XLayer.MpegFile XLayerMpeg = new(path);
