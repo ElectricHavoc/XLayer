@@ -1,35 +1,35 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
-    class BitReservoir
+    internal class BitReservoir
     {
         // Per the spec, the maximum buffer size for layer III is 7680 bits, which is 960 bytes.
         // The only catch is if we're decoding a "free" frame, which could be a lot more (since
         //  some encoders allow higher bitrates to maintain audio transparency).
-        byte[] _buf = new byte[8192];
-        int _start = 0, _end = -1, _bitsLeft = 0;
-        long _bitsRead = 0L;
+        private readonly byte[] _buf = new byte[8192];
+        private int _start = 0, _end = -1, _bitsLeft = 0;
+        private long _bitsRead = 0L;
 
-        static int GetSlots(IMpegFrame frame)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetSlots(IMpegFrame frame)
         {
-            var cnt = frame.FrameLength - 4;
+            int cnt = frame.FrameLength - 4;
             if (frame.HasCrc) cnt -= 2;
-
             if (frame.Version == MpegVersion.Version1 && frame.ChannelMode != MpegChannelMode.Mono) return cnt - 32;
             if (frame.Version > MpegVersion.Version1 && frame.ChannelMode == MpegChannelMode.Mono) return cnt - 9;
             return cnt - 17;
-
         }
 
         public bool AddBits(IMpegFrame frame, int overlap)
         {
-            var originalEnd = _end;
+            int originalEnd = _end;
 
-            var slots = GetSlots(frame);
+            int slots = GetSlots(frame);
             while (--slots >= 0)
             {
-                var temp = frame.ReadBits(8);
+                int temp = frame.ReadBits(8);
                 if (temp == -1) throw new System.IO.InvalidDataException("Frame did not have enough bytes!");
                 _buf[++_end] = (byte)temp;
                 if (_end == _buf.Length - 1) _end = -1;
@@ -62,8 +62,7 @@ namespace NLayer.Decoder
 
         public int GetBits(int count)
         {
-            int bitsRead;
-            var bits = TryPeekBits(count, out bitsRead);
+            int bits = TryPeekBits(count, out int bitsRead);
             if (bitsRead < count) throw new System.IO.InvalidDataException("Reservoir did not have enough bytes!");
 
             SkipBits(count);
@@ -71,14 +70,15 @@ namespace NLayer.Decoder
             return bits;
         }
 
-        public int Get1Bit()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Get1Bit()
         {
             // this is an optimized single-bit reader
             if (_bitsLeft == 0) throw new System.IO.InvalidDataException("Reservoir did not have enough bytes!");
 
             --_bitsLeft;
             ++_bitsRead;
-            var val = (_buf[_start] >> _bitsLeft) & 1;
+            bool val = ((_buf[_start] >> _bitsLeft) & 1) == 1;
 
             if (_bitsLeft == 0 && (_start = (_start + 1) % _buf.Length) != _end + 1)
             {
@@ -90,7 +90,7 @@ namespace NLayer.Decoder
 
         public int TryPeekBits(int count, out int readCount)
         {
-            if (count < 0 || count > 32) throw new ArgumentOutOfRangeException("count", "Must return between 0 and 32 bits!");
+            if (count < 0 || count > 32) throw new ArgumentOutOfRangeException(nameof(count), "Must return between 0 and 32 bits!");
 
             // if we don't have any bits left, just return no bits read
             if (_bitsLeft == 0 || count == 0)
@@ -100,22 +100,22 @@ namespace NLayer.Decoder
             }
 
             // get bits from the current start of the reservoir
-            var bits = (int)_buf[_start];
+            int bits = _buf[_start];
             if (count < _bitsLeft)
             {
                 // just grab the bits, adjust the "left" count, and return
                 bits >>= _bitsLeft - count;
-                bits &= ((1 << count) - 1);
+                bits &= (1 << count) - 1;
                 readCount = count;
                 return bits;
             }
 
             // we have to do it the hard way...
-            bits &= ((1 << _bitsLeft) - 1);
+            bits &= (1 << _bitsLeft) - 1;
             count -= _bitsLeft;
             readCount = _bitsLeft;
 
-            var resStart = _start;
+            int resStart = _start;
 
             // arg... gotta grab some more bits...
             while (count > 0)
@@ -127,11 +127,11 @@ namespace NLayer.Decoder
                 }
 
                 // figure out how many bits to pull from it
-                var bitsToRead = Math.Min(count, 8);
+                int bitsToRead = Math.Min(count, 8);
 
                 // move the existing bits over
                 bits <<= bitsToRead;
-                bits |= (_buf[resStart] >> ((8 - bitsToRead) % 8));
+                bits |= _buf[resStart] >> ((8 - bitsToRead) % 8);
 
                 // update our count
                 count -= bitsToRead;
@@ -143,32 +143,19 @@ namespace NLayer.Decoder
             return bits;
         }
 
-        public int BitsAvailable
-        {
-            get
-            {
-                if (_bitsLeft > 0)
-                {
-                    return (((_end + _buf.Length) - _start) % _buf.Length) * 8 + _bitsLeft;
-                }
-                return 0;
-            }
-        }
+        public int BitsAvailable => _bitsLeft > 0 ? (_end + _buf.Length - _start) % _buf.Length * 8 + _bitsLeft : 0;
+        public long BitsRead => _bitsRead;
 
-        public long BitsRead
-        {
-            get { return _bitsRead; }
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SkipBits(int count)
         {
             if (count > 0)
             {
                 // make sure we have enough bits to skip
-                if (count > BitsAvailable) throw new ArgumentOutOfRangeException("count");
+                ArgumentOutOfRangeException.ThrowIfGreaterThan(count, BitsAvailable);
 
                 // now calculate the new positions
-                var offset = (8 - _bitsLeft) + count;
+                int offset = 8 - _bitsLeft + count;
                 _start = ((offset / 8) + _start) % _buf.Length;
                 _bitsLeft = 8 - (offset % 8);
 
@@ -176,6 +163,7 @@ namespace NLayer.Decoder
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RewindBits(int count)
         {
             _bitsLeft += count;
@@ -191,6 +179,7 @@ namespace NLayer.Decoder
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void FlushBits()
         {
             if (_bitsLeft < 8)
@@ -199,6 +188,7 @@ namespace NLayer.Decoder
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Reset()
         {
             _start = 0;

@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
-namespace NLayer.Decoder
+namespace XLayer.Decoder
 {
-    class Huffman
+    internal class Huffman
     {
-        #region Hardcoded Tables (from the spec)
-
-        static readonly byte[][,] _codeTables =
-        {
+        private static readonly byte[][,] _codeTables =
+        [
             new byte[,] // 1
             {
                 {0x02, 0x01}, {0x00, 0x00}, {0x02, 0x01}, {0x00, 0x10},
@@ -767,11 +766,9 @@ namespace NLayer.Decoder
                 {0x04, 0x01}, {0x02, 0x01}, {0x00, 0x0c}, {0x00, 0x0d},
                 {0x02, 0x01}, {0x00, 0x0e}, {0x00, 0x0f},
             }
-        };
+        ];
 
-        #endregion
-
-        static readonly float[] _floatLookup;
+        private static readonly float[] _floatLookup;
 
         static Huffman()
         {
@@ -782,10 +779,10 @@ namespace NLayer.Decoder
             }
         }
 
-        static HuffmanListNode[] _llCache = new HuffmanListNode[_codeTables.Length];
-        static int[] _llCacheMaxBits = new int[_codeTables.Length];
+        private static readonly HuffmanListNode[] _llCache = new HuffmanListNode[_codeTables.Length];
+        private static readonly int[] _llCacheMaxBits = new int[_codeTables.Length];
 
-        static readonly int[] LIN_BITS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 8, 10, 13, 4, 5, 6, 7, 8, 9, 11, 13 };
+        private static readonly int[] LIN_BITS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 8, 10, 13, 4, 5, 6, 7, 8, 9, 11, 13];
 
         internal static void Decode(BitReservoir br, int table, out float x, out float y)
         {
@@ -795,99 +792,66 @@ namespace NLayer.Decoder
             }
             else
             {
-                var val = DecodeSymbol(br, table);
+                byte val = DecodeSymbol(br, table);
 
-                var ix = val >> 4;
-                var iy = val & 15;
+                int ix = val >> 4;
+                int iy = val & 15;
 
                 int linBits = LIN_BITS[table];
                 if (linBits > 0 && ix == 15) ix += br.GetBits(linBits);
-                if (ix != 0 && br.Get1Bit() != 0)
-                {
-                    x = -_floatLookup[ix];
-                }
-                else
+                if (ix == 0 || !br.Get1Bit())
                 {
                     x = _floatLookup[ix];
                 }
+                else
+                {
+                    x = -_floatLookup[ix];
+                }
 
                 if (linBits > 0 && iy == 15) iy += br.GetBits(linBits);
-                if (iy != 0 && br.Get1Bit() != 0)
+                if (iy == 0 || !br.Get1Bit())
                 {
-                    y = -_floatLookup[iy];
+                    y = _floatLookup[iy];
                 }
                 else
                 {
-                    y = _floatLookup[iy];
+                    y = -_floatLookup[iy];
                 }
             }
         }
 
         internal static void Decode(BitReservoir br, int table, out float x, out float y, out float v, out float w)
         {
-            var val = DecodeSymbol(br, table);
+            byte val = DecodeSymbol(br, table);
 
             v = w = x = y = 0;
 
             if ((val & 0x8) != 0)
             {
-                if (br.Get1Bit() == 1)
-                {
-                    v = -_floatLookup[1];
-                }
-                else
-                {
-                    v = _floatLookup[1];
-                }
+                v = br.Get1Bit() ? -_floatLookup[1] : _floatLookup[1];
             }
-
             if ((val & 0x4) != 0)
             {
-                if (br.Get1Bit() == 1)
-                {
-                    w = -_floatLookup[1];
-                }
-                else
-                {
-                    w = _floatLookup[1];
-                }
+                w = br.Get1Bit() ? -_floatLookup[1] : _floatLookup[1];
             }
-
             if ((val & 0x2) != 0)
             {
-                if (br.Get1Bit() == 1)
-                {
-                    x = -_floatLookup[1];
-                }
-                else
-                {
-                    x = _floatLookup[1];
-                }
+                x = br.Get1Bit() ? -_floatLookup[1] : _floatLookup[1];
             }
-
             if ((val & 0x1) != 0)
             {
-                if (br.Get1Bit() == 1)
-                {
-                    y = -_floatLookup[1];
-                }
-                else
-                {
-                    y = _floatLookup[1];
-                }
+                y = br.Get1Bit() ? -_floatLookup[1] : _floatLookup[1];
             }
         }
 
-        // In C#, bit operations are faster than the tree traversal the spec is written for.
-        static byte DecodeSymbol(BitReservoir br, int table)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static byte DecodeSymbol(BitReservoir br, int table)
         {
             // get the huffman node for decoding
-            int maxBits;
-            var node = GetNode(table, out maxBits);
+            HuffmanListNode node = GetNode(table, out int maxBits);
 
             // get some bits to work with
-            int readBits;
-            int bits = br.TryPeekBits(maxBits, out readBits);
+            int bits = br.TryPeekBits(maxBits, out int readBits);
             if (readBits < maxBits)
             {
                 bits <<= maxBits - readBits;
@@ -906,20 +870,13 @@ namespace NLayer.Decoder
             }
 
             // apply the value
-            if (node != null && node.Length <= readBits)
-            {
-                return node.Value;
-            }
-            else
-            {
-                // should we advance the reader????  need to check the spec
-                return 0;
-            }
+            return node != null && node.Length <= readBits ? node.Value : (byte)0;
         }
 
-        static HuffmanListNode GetNode(int table, out int maxBits)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static HuffmanListNode GetNode(int table, out int maxBits)
         {
-            var realIdx = table;
+            int realIdx = table;
             if (realIdx > 16)
             {
                 // these are "special"
@@ -959,27 +916,24 @@ namespace NLayer.Decoder
             return _llCache[realIdx];
         }
 
-        static HuffmanListNode InitTable(byte[,] tree, out int maxBits)
+        private static HuffmanListNode InitTable(byte[,] tree, out int maxBits)
         {
-            var values = new List<byte>();
-            var lengths = new List<int>();
-            var codes = new List<int>();
+            List<byte> values = [];
+            List<int> lengths = [];
+            List<int> codes = [];
 
-            var treeLen = tree.GetLength(0);
+            int treeLen = tree.GetLength(0);
 
             for (int i = 0; i < treeLen; i++)
             {
                 if (tree[i, 0] == 0)
                 {
-                    var bits = 0;
-                    var len = 0;
-                    var idx = i;
-                    int bit;
-                    do
+                    int bits = 0, len = 0, idx = i;
+                    while (idx > 0)
                     {
-                        idx = FindPreviousNode(tree, idx, out bit);
+                        idx = FindPreviousNode(tree, idx, out int bit);
                         bits |= bit << len++;
-                    } while (idx > 0);
+                    }
 
                     values.Add(tree[i, 1]);
                     lengths.Add(len);
@@ -987,10 +941,11 @@ namespace NLayer.Decoder
                 }
             }
 
-            return BuildLinkedList(values, lengths, codes, out maxBits);
+            maxBits = lengths.Count > 0 ? lengths.Max() : 0;
+            return BuildLinkedList(values, lengths, codes, out _);
         }
 
-        static int FindPreviousNode(byte[,] tree, int idx, out int bit)
+        private static int FindPreviousNode(byte[,] tree, int idx, out int bit)
         {
             // look for a preceding value that matches
             for (int i = idx - 1; i >= 0; i--)
@@ -1008,7 +963,7 @@ namespace NLayer.Decoder
                             if (tree[i, j] >= 250)
                             {
                                 // if so, find it's parent and return that...
-                                var temp = FindPreviousNode(tree, i, out bit);
+                                int temp = FindPreviousNode(tree, i, out bit);
                                 if (bit != j) throw new InvalidOperationException();
                                 return temp;
                             }
@@ -1023,15 +978,15 @@ namespace NLayer.Decoder
             throw new InvalidOperationException();
         }
 
-        static HuffmanListNode BuildLinkedList(List<byte> values, List<int> lengthList, List<int> codeList, out int maxBits)
+        private static HuffmanListNode BuildLinkedList(List<byte> values, List<int> lengthList, List<int> codeList, out int maxBits)
         {
-            var list = new HuffmanListNode[lengthList.Count];
+            HuffmanListNode[] list = new HuffmanListNode[lengthList.Count];
 
             maxBits = lengthList.Max();
 
             for (int i = 0; i < list.Length; i++)
             {
-                var shift = maxBits - lengthList[i];
+                int shift = maxBits - lengthList[i];
                 list[i] = new HuffmanListNode
                 {
                     Value = values[i],
@@ -1052,7 +1007,7 @@ namespace NLayer.Decoder
             return list[0];
         }
 
-        class HuffmanListNode
+        private class HuffmanListNode
         {
             internal byte Value;
 
