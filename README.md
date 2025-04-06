@@ -4,6 +4,8 @@ XLayer is a fully managed MP3 to WAV decoder.
 
 This repository is my port of [NLayer](https://github.com/naudio/NLayer) to modern .NET
 
+Install with `dotnet add package XLayer`
+
 Optimized for performance:
 
 | Method | Mean     | Error   | StdDev  | Ratio | Gen0       | Gen1      | Allocated | Alloc Ratio |
