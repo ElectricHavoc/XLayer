@@ -1,4 +1,5 @@
 # XLayer
+# XLayer
 
 XLayer is a fully managed MP3 to WAV decoder. 
 
@@ -32,7 +33,7 @@ Then create an `MpegFile`, pass a file name or a stream to the constructor, and 
 // samples per second times channel count
 const int samplesCount = 44100;
 var fileName = "myMp3File.mp3";
-var mpegFile = new MpegFile(filename);
+var mpegFile = new MpegFile(fileName);
 float[] samples = new float[samplesCount];
 int readCount = mpegFile.ReadSamples(samples, 0, samplesCount);
 ```
@@ -50,3 +51,8 @@ XLayer.Tests project:
 - `dotnet run`, will compare NLayer samples = XLayer samples
 - `dotnet run -m`, helper that will run just XLayer for memory profiling
 - `dotnet run -b`, run benchmarks against NLayer
+
+Sample music is from my god-father's classic rock band [The Toons](https://www.discogs.com/artist/767082-The-Toons). 
+
+<img src="toons1.png" alt="alt text" width="200" height="200" style="border: 2px solid black; box-shadow: 10px 10px 10px black" /> &nbsp;&nbsp;&nbsp;
+<img src="toons2.png" alt="alt text" width="200" height="200" style="border: 2px solid black; box-shadow: 10px 10px 10px black" />
