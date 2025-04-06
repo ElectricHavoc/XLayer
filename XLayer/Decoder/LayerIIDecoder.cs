@@ -3,51 +3,42 @@
  * 
  */
 
-using System;
-
 namespace XLayer.Decoder
 {
     // there's not much we have to do here... table selection, granule count, scalefactor selection
-    class LayerIIDecoder : LayerIIDecoderBase
+    internal class LayerIIDecoder : LayerIIDecoderBase
     {
-        static internal bool GetCRC(MpegFrame frame, ref uint crc)
-        {
-            return LayerIIDecoderBase.GetCRC(frame, SelectTable(frame), _allocLookupTable, true, ref crc);
-        }
+        static internal bool GetCRC(MpegFrame frame, ref uint crc) => GetCRC(frame, SelectTable(frame), _allocLookupTable, true, ref crc);
 
         // figure out which rate table to use...  basically, high-rate full, high-rate limited, low-rate limited, low-rate minimal, and LSF.
-        static int[] SelectTable(IMpegFrame frame)
+        private static int[] SelectTable(IMpegFrame frame)
         {
-            var bitRatePerChannel = (frame.BitRate / (frame.ChannelMode == MpegChannelMode.Mono ? 1 : 2)) / 1000;
+            int bitRatePerChannel = frame.BitRate / (frame.ChannelMode == MpegChannelMode.Mono ? 1 : 2) / 1000;
 
-            if (frame.Version == MpegVersion.Version1)
+            switch (frame.Version)
             {
-                if ((bitRatePerChannel >= 56 && bitRatePerChannel <= 80) || (frame.SampleRate == 48000 && bitRatePerChannel >= 56))
-                {
-                    return _rateLookupTable[0];   // high-rate, 27 subbands
-                }
-                else if (frame.SampleRate != 48000 && bitRatePerChannel >= 96)
-                {
-                    return _rateLookupTable[1];   // high-rate, 30 subbands
-                }
-                else if (frame.SampleRate != 32000 && bitRatePerChannel <= 48)
-                {
-                    return _rateLookupTable[2];   // low-rate, 8 subbands
-                }
-                else
-                {
-                    return _rateLookupTable[3];   // low-rate, 12 subbands
-                }
-            }
-            else
-            {
-                return _rateLookupTable[4];   // lsf, 30 subbands
+                case MpegVersion.Version1:
+                    if (bitRatePerChannel >= 56 && (bitRatePerChannel <= 80 || frame.SampleRate == 48000))
+                    {
+                        return _rateLookupTable[0];   // high-rate, 27 subbands
+                    }
+                    if (frame.SampleRate != 48000 && bitRatePerChannel >= 96)
+                    {
+                        return _rateLookupTable[1];   // high-rate, 30 subbands
+                    }
+                    if (frame.SampleRate != 32000 && bitRatePerChannel <= 48)
+                    {
+                        return _rateLookupTable[2];   // low-rate, 8 subbands
+                    }
+                    return _rateLookupTable[3];       // low-rate, 12 subbands
+                default:
+                    return _rateLookupTable[4];           // lsf, 30 subbands
             }
         }
 
         // this table tells us which allocation lookup list to use for each subband
         // note that each row has the same number of elements as there are subbands for that type...
-        static readonly int[][] _rateLookupTable = [
+        private static readonly int[][] _rateLookupTable = [
                                                        //          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29
                                                        [3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],             // high-rate, 27 subbands
                                                        [3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],    // high-rate, 30 subbands
@@ -58,7 +49,7 @@ namespace XLayer.Decoder
 
         // this tells the decode logic: a) how many bits per allocation, and b) how many bits per sample for the give allocation value
         //  if negative, read -x bits and handle as a group
-        static readonly int[][] _allocLookupTable = [
+        private static readonly int[][] _allocLookupTable = [
                                                         //       bits   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
                                                         [2,  0, -5, -7, 16],                                                 // 0 (II)
                                                         [3,  0, -5, -7,  3,-10,  4,  5, 16],                                 // 1 (II)
@@ -72,10 +63,7 @@ namespace XLayer.Decoder
 
         internal LayerIIDecoder() : base(_allocLookupTable, 3) { }
 
-        protected override int[] GetRateTable(IMpegFrame frame)
-        {
-            return SelectTable(frame);
-        }
+        protected override int[] GetRateTable(IMpegFrame frame) => SelectTable(frame);
 
         protected override void ReadScaleFactorSelection(IMpegFrame frame, int[][] scfsi, int channels)
         {
@@ -84,10 +72,7 @@ namespace XLayer.Decoder
             {
                 for (int ch = 0; ch < channels; ch++)
                 {
-                    if (scfsi[ch][sb] == 2)
-                    {
-                        scfsi[ch][sb] = frame.ReadBits(2);
-                    }
+                    if (scfsi[ch][sb] == 2) scfsi[ch][sb] = frame.ReadBits(2);
                 }
             }
         }

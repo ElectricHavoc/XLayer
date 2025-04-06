@@ -1,9 +1,8 @@
 ﻿namespace XLayer.Decoder
 {
-    class VBRInfo
+    internal class VBRInfo
     {
         internal VBRInfo() { }
-
         internal int SampleCount { get; set; }
         internal int SampleRate { get; set; }
         internal int Channels { get; set; }
@@ -11,22 +10,7 @@
         internal int VBRBytes { get; set; }
         internal int VBRQuality { get; set; }
         internal int VBRDelay { get; set; }
-
-        internal long VBRStreamSampleCount
-        {
-            get
-            {
-                // we assume the entire stream is consistent wrt samples per frame
-                return VBRFrames * SampleCount;
-            }
-        }
-
-        internal int VBRAverageBitrate
-        {
-            get
-            {
-                return (int)((VBRBytes / (VBRStreamSampleCount / (double)SampleRate)) * 8);
-            }
-        }
+        internal long VBRStreamSampleCount => VBRFrames * SampleCount;
+        internal int VBRAverageBitrate => (int)(VBRBytes / (VBRStreamSampleCount / (double)SampleRate) * 8);
     }
 }

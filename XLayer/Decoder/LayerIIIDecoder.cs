@@ -31,19 +31,20 @@
  */
 
 using System;
+using System.Runtime.CompilerServices;
 
 namespace XLayer.Decoder
 {
     /// <summary>
     /// Class Implementing Layer 3 Decoder.
     /// </summary>
-    sealed partial class LayerIIIDecoder : LayerDecoderBase
+    internal sealed partial class LayerIIIDecoder : LayerDecoderBase
     {
-        const int SSLIMIT = 18;
+        private const int SSLIMIT = 18;
 
         static internal bool GetCRC(MpegFrame frame, ref uint crc)
         {
-            var cnt = frame.GetSideDataSize();
+            int cnt = frame.GetSideDataSize();
             while (--cnt >= 0)
             {
                 MpegFrame.UpdateCRC(frame.ReadBits(8), 8, ref crc);
@@ -51,8 +52,8 @@ namespace XLayer.Decoder
             return true;
         }
 
-        readonly HybridMDCT _hybrid = new();
-        readonly BitReservoir _bitRes = new();
+        private readonly HybridMDCT _hybrid = new();
+        private readonly BitReservoir _bitRes = new();
 
         internal LayerIIIDecoder()
         {
@@ -69,56 +70,42 @@ namespace XLayer.Decoder
             ];
         }
 
-        internal override int DecodeFrame(IMpegFrame frame, float[] ch0, float[] ch1)
+        internal override int DecodeFrame(IMpegFrame frame, Span<float> ch0, Span<float> ch1)
         {
-            // load the frame information
             ReadSideInfo(frame);
+            if (!_bitRes.AddBits(frame, _mainDataBegin)) return 0;
 
-            // load the frame's main data
-            if (!_bitRes.AddBits(frame, _mainDataBegin))
-            {
-                return 0;
-            }
-
-            // prep the reusable tables
             PrepTables(frame);
 
-            // do our stereo mode setup
-            var chanBufs = new float[2][];
-            var startChannel = 0;
-            var endChannel = _channels - 1;
+            // Get references for channel buffers - replaces the chanBufs array
+            Span<float> chan0 = null, chan1 = null;
+            int startChannel = 0;
+            int endChannel = _channels - 1;
+
             if (_channels == 1 || StereoMode == StereoMode.LeftOnly || StereoMode == StereoMode.DownmixToMono)
             {
-                chanBufs[0] = ch0;
+                chan0 = ch0;
                 endChannel = 0;
             }
             else if (StereoMode == StereoMode.RightOnly)
             {
-                chanBufs[1] = ch0;  // this is correct... if there's only a single channel output, it goes in channel 0's buffer
+                chan0 = ch0;  // Right channel output goes to ch0 buffer when it's the only output
                 startChannel = 1;
             }
             else    // MpegStereoMode.Both
             {
-                chanBufs[0] = ch0;
-                chanBufs[1] = ch1;
+                chan0 = ch0;
+                chan1 = ch1;
             }
 
             // get the granule count
-            int granules;
-            if (frame.Version == MpegVersion.Version1)
-            {
-                granules = 2;
-            }
-            else
-            {
-                granules = 1;
-            }
+            int granules = frame.Version == MpegVersion.Version1 ? 2 : 1;
 
             // decode the audio data
             int offset = 0;
-            for (var gr = 0; gr < granules; gr++)
+            for (int gr = 0; gr < granules; gr++)
             {
-                for (var ch = 0; ch < _channels; ch++)
+                for (int ch = 0; ch < _channels; ch++)
                 {
                     // read scale factors
                     int sfbits;
@@ -141,10 +128,10 @@ namespace XLayer.Decoder
                 for (int ch = startChannel; ch <= endChannel; ch++)
                 {
                     // pull some values so we don't have to index them again later
-                    var buf = _samples[ch];
-                    var blockType = _blockType[gr][ch];
-                    var blockSplit = _blockSplitFlag[gr][ch];
-                    var mixedBlock = _mixedBlockFlag[gr][ch];
+                    Span<float> samples = _samples[ch];
+                    int blockType = _blockType[gr][ch];
+                    bool blockSplit = _blockSplitFlag[gr][ch];
+                    bool mixedBlock = _mixedBlockFlag[gr][ch];
 
                     // do the short/long/mixed logic here so it's only done once per channel per granule
                     if (blockSplit && blockType == 2)
@@ -152,32 +139,39 @@ namespace XLayer.Decoder
                         if (mixedBlock)
                         {
                             // reorder & antialias mixed blocks
-                            Reorder(buf, true);
-                            AntiAlias(buf, true);
+                            Reorder(samples, true);
+                            AntiAlias(samples, true);
                         }
                         else
                         {
                             // reorder short blocks
-                            Reorder(buf, false);
+                            Reorder(samples, false);
                         }
                     }
                     else
                     {
                         // antialias long blocks
-                        AntiAlias(buf, false);
+                        AntiAlias(samples, false);
                     }
 
                     // hybrid processing
-                    _hybrid.Apply(buf, ch, blockType, blockSplit && mixedBlock);
+                    _hybrid.Apply(samples, ch, blockType, blockSplit && mixedBlock);
 
                     // frequency inversion
-                    FrequencyInversion(buf);
+                    FrequencyInversion(samples);
 
                     // inverse polyphase
-                    InversePolyphase(buf, ch, offset, chanBufs[ch]);
+                    if (ch == 0)
+                    {
+                        InversePolyphase(samples, ch, offset, chan0);
+                    }
+                    else
+                    {
+                        InversePolyphase(samples, ch, offset, chan1);
+                    }
                 }
 
-                offset += SBLIMIT * SSLIMIT;
+                offset += LookupTables.SBLIMIT * SSLIMIT;
             }
 
             return offset;
@@ -192,25 +186,25 @@ namespace XLayer.Decoder
             _bitRes.Reset();
         }
 
-        int _channels, _privBits, _mainDataBegin;
+        private int _channels, _privBits, _mainDataBegin;
 
-        readonly int[][] _scfsi = [new int[4], new int[4]];                //     ch, scfsi_band
-        readonly int[][] _part23Length = [new int[2], new int[2]];         // gr, ch
-        readonly int[][] _bigValues = [new int[2], new int[2]];            // gr, ch
-        readonly float[][] _globalGain = [new float[2], new float[2]];     // gr, ch
-        readonly int[][] _scalefacCompress = [new int[2], new int[2]];     // gr, ch
-        readonly bool[][] _blockSplitFlag = [new bool[2], new bool[2]];    // gr, ch
-        readonly bool[][] _mixedBlockFlag = [new bool[2], new bool[2]];    // gr, ch
-        readonly int[][] _blockType = [new int[2], new int[2]];            // gr, ch
-        readonly int[][][] _tableSelect;                                     // gr, ch, region
-        readonly float[][][] _subblockGain;                                  // gr, ch, window
-        readonly int[][] _regionAddress1 = [new int[2], new int[2]];       // gr, ch
-        readonly int[][] _regionAddress2 = [new int[2], new int[2]];       // gr, ch
-        readonly int[][] _preflag = [new int[2], new int[2]];              // gr, ch
-        readonly float[][] _scalefacScale = [new float[2], new float[2]];  // gr, ch
-        readonly int[][] _count1TableSelect = [new int[2], new int[2]];    // gr, ch
+        private readonly int[][] _scfsi = [new int[4], new int[4]];                //     ch, scfsi_band
+        private readonly int[][] _part23Length = [new int[2], new int[2]];         // gr, ch
+        private readonly int[][] _bigValues = [new int[2], new int[2]];            // gr, ch
+        private readonly float[][] _globalGain = [new float[2], new float[2]];     // gr, ch
+        private readonly int[][] _scalefacCompress = [new int[2], new int[2]];     // gr, ch
+        private readonly bool[][] _blockSplitFlag = [new bool[2], new bool[2]];    // gr, ch
+        private readonly bool[][] _mixedBlockFlag = [new bool[2], new bool[2]];    // gr, ch
+        private readonly int[][] _blockType = [new int[2], new int[2]];            // gr, ch
+        private readonly int[][][] _tableSelect;                                     // gr, ch, region
+        private readonly float[][][] _subblockGain;                                  // gr, ch, window
+        private readonly int[][] _regionAddress1 = [new int[2], new int[2]];       // gr, ch
+        private readonly int[][] _regionAddress2 = [new int[2], new int[2]];       // gr, ch
+        private readonly int[][] _preflag = [new int[2], new int[2]];              // gr, ch
+        private readonly float[][] _scalefacScale = [new float[2], new float[2]];  // gr, ch
+        private readonly int[][] _count1TableSelect = [new int[2], new int[2]];    // gr, ch
 
-        static readonly float[] GAIN_TAB =
+        private static readonly float[] GAIN_TAB =
         [
             1.57009245868378E-16f, 1.86716512307887E-16f, 2.22044604925031E-16f, 2.64057024024816E-16f, 3.14018491736756E-16f, 3.73433024615774E-16f, 4.44089209850063E-16f, 5.28114048049630E-16f,
             6.28036983473509E-16f, 7.46866049231544E-16f, 8.88178419700125E-16f, 1.05622809609926E-15f, 1.25607396694702E-15f, 1.49373209846309E-15f, 1.77635683940025E-15f, 2.11245619219853E-15f,
@@ -224,13 +218,13 @@ namespace XLayer.Decoder
             4.11590317489199E-11f, 4.89466134024385E-11f, 5.82076609134674E-11f, 6.92209645059613E-11f, 8.23180634978400E-11f, 9.78932268048772E-11f, 1.16415321826935E-10f, 1.38441929011922E-10f,
             1.64636126995680E-10f, 1.95786453609754E-10f, 2.32830643653870E-10f, 2.76883858023845E-10f, 3.29272253991360E-10f, 3.91572907219509E-10f, 4.65661287307739E-10f, 5.53767716047690E-10f,
             6.58544507982719E-10f, 7.83145814439016E-10f, 9.31322574615479E-10f, 1.10753543209538E-09f, 1.31708901596544E-09f, 1.56629162887804E-09f, 1.86264514923096E-09f, 2.21507086419076E-09f,
-            2.63417803193088E-09f, 3.13258325775607E-09f, 3.72529029846191E-09f, 4.43014172838152E-09f, 5.26835606386176E-09f, 6.26516651551212E-09f, 7.45058059692383E-09f, 8.86028345676304E-09f,
+            2.63417803193088E-09f, 3.05916333765241E-09f, 3.72529029846191E-09f, 4.43014172838152E-09f, 5.26835606386176E-09f, 6.11832667530482E-09f, 7.45058059692383E-09f, 8.86028345676304E-09f,
             1.05367121277235E-08f, 1.25303330310243E-08f, 1.49011611938477E-08f, 1.77205669135261E-08f, 2.10734242554471E-08f, 2.50606660620485E-08f, 2.98023223876953E-08f, 3.54411338270521E-08f,
             4.21468485108941E-08f, 5.01213321240971E-08f, 5.96046447753906E-08f, 7.08822676541044E-08f, 8.42936970217880E-08f, 1.00242664248194E-07f, 1.19209289550781E-07f, 1.41764535308209E-07f,
             1.68587394043576E-07f, 2.00485328496388E-07f, 2.38418579101562E-07f, 2.83529070616417E-07f, 3.37174788087152E-07f, 4.00970656992777E-07f, 4.76837158203125E-07f, 5.67058141232835E-07f,
             6.74349576174305E-07f, 8.01941313985553E-07f, 9.53674316406250E-07f, 1.13411628246567E-06f, 1.34869915234861E-06f, 1.60388262797110E-06f, 1.90734863281250E-06f, 2.26823256493134E-06f,
             2.69739830469722E-06f, 3.20776525594221E-06f, 3.81469726562500E-06f, 4.53646512986268E-06f, 5.39479660939444E-06f, 6.41553051188442E-06f, 7.62939453125000E-06f, 9.07293025972536E-06f,
-            1.07895932187889E-05f, 1.28310610237688E-05f, 1.52587890625000E-05f, 1.81458605194507E-05f, 2.15791864375777E-05f, 2.56621220475377E-05f, 3.05175781250000E-05f, 3.62917210389014E-05f,
+            1.07895932187889E-05f, 1.28310610237688E-05f, 1.52587890625000E-05f, 1.81458605194507E-05f, 2.15791864375777E-05f, 2.50606660620485E-05f, 3.05175781250000E-05f, 3.62917210389014E-05f,
             4.31583728751555E-05f, 5.13242440950754E-05f, 6.10351562500000E-05f, 7.25834420778029E-05f, 8.63167457503110E-05f, 1.02648488190151E-04f, 1.22070312500000E-04f, 1.45166884155606E-04f,
             1.72633491500622E-04f, 2.05296976380301E-04f, 2.44140625000000E-04f, 2.90333768311211E-04f, 3.45266983001244E-04f, 4.10593952760603E-04f, 4.88281250000000E-04f, 5.80667536622423E-04f,
             6.90533966002488E-04f, 8.21187905521206E-04f, 9.76562500000000E-04f, 1.16133507324485E-03f, 1.38106793200498E-03f, 1.64237581104241E-03f, 1.95312500000000E-03f, 2.32267014648969E-03f,
@@ -246,7 +240,7 @@ namespace XLayer.Decoder
             7.24077343935025E+02f, 8.61077929219803E+02f, 1.02400000000000E+03f, 1.21774808576279E+03f, 1.44815468787005E+03f, 1.72215585843961E+03f, 2.04800000000000E+03f, 2.43549617152557E+03f,
         ];
 
-        void ReadSideInfo(IMpegFrame frame)
+        private void ReadSideInfo(IMpegFrame frame)
         {
             if (frame.Version == MpegVersion.Version1)
             {
@@ -265,7 +259,7 @@ namespace XLayer.Decoder
                     _channels = 2;
                 }
 
-                for (var ch = 0; ch < _channels; ch++)
+                for (int ch = 0; ch < _channels; ch++)
                 {
                     // scfsi[ch][0...3]     1 x4
                     _scfsi[ch][0] = frame.ReadBits(1);
@@ -274,9 +268,9 @@ namespace XLayer.Decoder
                     _scfsi[ch][3] = frame.ReadBits(1);
                 }
 
-                for (var gr = 0; gr < 2; gr++)
+                for (int gr = 0; gr < 2; gr++)
                 {
-                    for (var ch = 0; ch < _channels; ch++)
+                    for (int ch = 0; ch < _channels; ch++)
                     {
                         // part2_3_length[gr][ch]        12
                         _part23Length[gr][ch] = frame.ReadBits(12);
@@ -357,8 +351,8 @@ namespace XLayer.Decoder
                     _channels = 2;
                 }
 
-                var gr = 0;
-                for (var ch = 0; ch < _channels; ch++)
+                int gr = 0;
+                for (int ch = 0; ch < _channels; ch++)
                 {
                     // part2_3_length[gr][ch]        12
                     _part23Length[gr][ch] = frame.ReadBits(12);
@@ -421,13 +415,13 @@ namespace XLayer.Decoder
             }
         }
 
-        int[] _sfBandIndexL, _sfBandIndexS;
+        private int[] _sfBandIndexL, _sfBandIndexS;
 
         // these are byte[] to save memory
-        readonly byte[] _cbLookupL = new byte[SSLIMIT * SBLIMIT], _cbLookupS = new byte[SSLIMIT * SBLIMIT], _cbwLookupS = new byte[SSLIMIT * SBLIMIT];
-        int _cbLookupSR;
+        private readonly byte[] _cbLookupL = new byte[SSLIMIT * LookupTables.SBLIMIT], _cbLookupS = new byte[SSLIMIT * LookupTables.SBLIMIT], _cbwLookupS = new byte[SSLIMIT * LookupTables.SBLIMIT];
+        private int _cbLookupSR;
 
-        static readonly int[][] _sfBandIndexLTable = [
+        private static readonly int[][] _sfBandIndexLTable = [
                                                          // MPEG 1
                                                          // 44.1 kHz
                                                          [0, 4, 8, 12, 16, 20, 24, 30, 36, 44, 52, 62, 74, 90, 110, 134, 162, 196, 238, 288, 342, 418, 576],
@@ -453,7 +447,7 @@ namespace XLayer.Decoder
                                                          [0, 12, 24, 36, 48, 60, 72, 88, 108, 132, 160, 192, 232, 280, 336, 400, 476, 566, 568, 570, 572, 574, 576],
                                                      ];
 
-        static readonly int[][] _sfBandIndexSTable = [
+        private static readonly int[][] _sfBandIndexSTable = [
                                                          // MPEG 1
                                                          // 44.1 kHz
                                                          [0, 4, 8, 12, 16, 22, 30, 40, 52, 66, 84, 106, 136, 192],
@@ -479,7 +473,7 @@ namespace XLayer.Decoder
                                                          [0, 8, 16, 24, 36, 52, 72, 96, 124, 160, 162, 164, 166, 192],
                                                      ];
 
-        void PrepTables(IMpegFrame frame)
+        private void PrepTables(IMpegFrame frame)
         {
             if (_cbLookupSR != frame.SampleRate)
             {
@@ -548,7 +542,7 @@ namespace XLayer.Decoder
                 int idx = 0;
                 for (cbS = 0; cbS < 12; cbS++)
                 {
-                    var width = _sfBandIndexS[cbS + 1] - _sfBandIndexS[cbS];
+                    int width = _sfBandIndexS[cbS + 1] - _sfBandIndexS[cbS];
                     for (int i = 0; i < 3; i++)
                     {
                         for (int j = 0; j < width; j++, idx++)
@@ -562,17 +556,17 @@ namespace XLayer.Decoder
             }
         }
 
-        readonly int[][][] _scalefac = [   // ch, window, cb
+        private readonly int[][][] _scalefac = [   // ch, window, cb
                                   [new int[13], new int[13], new int[13], new int[23]],
                                   [new int[13], new int[13], new int[13], new int[23]]
                               ];
 
-        static readonly int[][] _slen = [
+        private static readonly int[][] _slen = [
                                             [0, 0, 0, 0, 3, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4],
                                             [0, 1, 2, 3, 0, 1, 2, 3, 1, 2, 3, 1, 2, 3, 2, 3]
                                         ];
 
-        static readonly int[][][] _sfbBlockCntTab = [
+        private static readonly int[][][] _sfbBlockCntTab = [
                                                         [[6, 5, 5, 5],   [9, 9, 9, 9],    [6, 9, 9, 9]],
                                                         [[6, 5, 7, 3],   [9, 9, 12, 6],   [6, 9, 12, 6]],
                                                         [[11, 10, 0, 0], [18, 18, 0, 0],  [15, 18, 0, 0]],
@@ -581,10 +575,10 @@ namespace XLayer.Decoder
                                                         [[8, 8, 5, 0],   [15, 12, 9, 0],  [6, 18, 9, 0]],
                                                     ];
 
-        int ReadScalefactors(int gr, int ch)
+        private int ReadScalefactors(int gr, int ch)
         {
-            var slen0 = _slen[0][_scalefacCompress[gr][ch]];
-            var slen1 = _slen[1][_scalefacCompress[gr][ch]];
+            int slen0 = _slen[0][_scalefacCompress[gr][ch]];
+            int slen1 = _slen[1][_scalefacCompress[gr][ch]];
             int bits;
 
             int cb = 0;
@@ -714,55 +708,39 @@ namespace XLayer.Decoder
             return bits;
         }
 
-        int ReadLsfScalefactors(int gr, int ch, int chanModeExt)
+        private int ReadLsfScalefactors(int gr, int ch, int chanModeExt)
         {
-            var sfc = _scalefacCompress[gr][ch];
+            int sfc = _scalefacCompress[gr][ch];
 
-            int blockTypeNumber;
-            // block type number = 2 if mixed short, 1 if pure short, otherwise 0
-            if (_blockType[gr][ch] == 2)
-            {
-                if (_mixedBlockFlag[gr][ch])
-                {
-                    blockTypeNumber = 2;
-                }
-                else
-                {
-                    blockTypeNumber = 1;
-                }
-            }
-            else
-            {
-                blockTypeNumber = 0;
-            }
+            int blockTypeNumber = (_blockType[gr][ch] == 2) ? (_mixedBlockFlag[gr][ch] ? 2 : 1) : 0;
 
-            int[] slen = new int[4];
+            Span<int> slen = stackalloc int[4];
             int blockNumber;
             if ((chanModeExt & 1) == 1 && ch == 1)
             {
-                var tsfc = sfc >> 1;
+                int tsfc = sfc >> 1;
                 if (tsfc < 180)
                 {
-                    slen[0] = tsfc / 36;                    // <= 4, 15
-                    slen[1] = (tsfc % 36) / 6;              // <= 5, 31
-                    slen[2] = tsfc % 6;                     // <= 5, 31
+                    slen[0] = tsfc / 36;
+                    slen[1] = (tsfc % 36) / 6;
+                    slen[2] = tsfc % 6;
                     slen[3] = 0;
                     _preflag[gr][ch] = 0;
                     blockNumber = 3;
                 }
                 else if (tsfc < 244)
                 {
-                    slen[0] = ((tsfc - 180) % 64) >> 4;     // <= 3, 7
-                    slen[1] = ((tsfc - 180) % 16) >> 2;     // <= 3, 7
-                    slen[2] = ((tsfc - 180) % 4);           // <= 3, 7
+                    slen[0] = ((tsfc - 180) % 64) >> 4;
+                    slen[1] = ((tsfc - 180) % 16) >> 2;
+                    slen[2] = (tsfc - 180) % 4;
                     slen[3] = 0;
                     _preflag[gr][ch] = 0;
                     blockNumber = 4;
                 }
                 else if (tsfc < 255)
                 {
-                    slen[0] = (tsfc - 244) / 3;             // <= 3, 7
-                    slen[1] = (tsfc - 244) % 3;             // <= 1, 1
+                    slen[0] = (tsfc - 244) / 3;
+                    slen[1] = (tsfc - 244) % 3;
                     slen[2] = 0;
                     slen[3] = 0;
                     _preflag[gr][ch] = 0;
@@ -775,29 +753,28 @@ namespace XLayer.Decoder
             }
             else
             {
-                //   if scalefac_comp < 400
                 if (sfc < 400)
                 {
-                    slen[0] = (sfc >> 4) / 5;               // <= 4, 15
-                    slen[1] = (sfc >> 4) % 5;               // <= 4, 15
-                    slen[2] = (sfc & 15) >> 2;              // <= 3, 7
-                    slen[3] = sfc & 3;                      // <= 3, 7
+                    slen[0] = (sfc >> 4) / 5;
+                    slen[1] = (sfc >> 4) % 5;
+                    slen[2] = (sfc & 15) >> 2;
+                    slen[3] = sfc & 3;
                     _preflag[gr][ch] = 0;
                     blockNumber = 0;
                 }
                 else if (sfc < 500)
                 {
-                    slen[0] = ((sfc - 400) >> 2) / 5;       // <= 4, 15
-                    slen[1] = ((sfc - 400) >> 2) % 5;       // <= 4, 15
-                    slen[2] = (sfc - 400) & 3;              // <= 3, 7
+                    slen[0] = ((sfc - 400) >> 2) / 5;
+                    slen[1] = ((sfc - 400) >> 2) % 5;
+                    slen[2] = (sfc - 400) & 3;
                     slen[3] = 0;
                     _preflag[gr][ch] = 0;
                     blockNumber = 1;
                 }
                 else if (sfc < 512)
                 {
-                    slen[0] = (sfc - 500) / 3;              // <= 3, 7
-                    slen[1] = (sfc - 500) % 3;              // <= 2, 3
+                    slen[0] = (sfc - 500) / 3;
+                    slen[1] = (sfc - 500) % 3;
                     slen[2] = 0;
                     slen[3] = 0;
                     _preflag[gr][ch] = 1;
@@ -809,11 +786,10 @@ namespace XLayer.Decoder
                 }
             }
 
-            // now we populate our buffer...
-            var buffer = new int[54];
+            Span<int> buffer = stackalloc int[54];
 
-            var k = 0;
-            var blkCnt = _sfbBlockCntTab[blockNumber][blockTypeNumber];
+            int k = 0;
+            int[] blkCnt = _sfbBlockCntTab[blockNumber][blockTypeNumber];
             for (int i = 0; i < 4; i++)
             {
                 if (slen[i] != 0)
@@ -829,7 +805,6 @@ namespace XLayer.Decoder
                 }
             }
 
-            // now that we have that done, let's assign our scalefactors
             k = 0;
             int sfb = 0;
             if (_blockSplitFlag[gr][ch] && _blockType[gr][ch] == 2)
@@ -866,11 +841,11 @@ namespace XLayer.Decoder
             return slen[0] * blkCnt[0] + slen[1] * blkCnt[1] + slen[2] * blkCnt[2] + slen[3] * blkCnt[3];
         }
 
-        readonly float[][] _samples = [new float[SSLIMIT * SBLIMIT + 3], new float[SSLIMIT * SBLIMIT + 3]];
+        private readonly float[][] _samples = [new float[SSLIMIT * LookupTables.SBLIMIT + 3], new float[SSLIMIT * LookupTables.SBLIMIT + 3]];
 
-        static readonly int[] PRETAB = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 3, 2, 0];
+        private static readonly int[] PRETAB = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 3, 2, 0];
 
-        static readonly float[] POW2_TAB =
+        private static readonly float[] POW2_TAB =
         [
             1.000000000000000E-00f, 7.071067811865470E-01f, 5.000000000000000E-01f, 3.535533905932740E-01f, 2.500000000000000E-01f, 1.767766952966370E-01f, 1.250000000000000E-01f, 8.838834764831840E-02f,
             6.250000000000000E-02f, 4.419417382415920E-02f, 3.125000000000000E-02f, 2.209708691207960E-02f, 1.562500000000000E-02f, 1.104854345603980E-02f, 7.812500000000000E-03f, 5.524271728019900E-03f,
@@ -882,7 +857,7 @@ namespace XLayer.Decoder
             3.725290298461910E-09f, 2.634178031930880E-09f, 1.862645149230960E-09f, 1.317089015965440E-09f, 9.313225746154790E-10f, 6.585445079827190E-10f, 4.656612873077390E-10f, 3.292722539913600E-10f,
         ];
 
-        void ReadSamples(int sfBits, int gr, int ch)
+        private void ReadSamples(int sfBits, int gr, int ch)
         {
             int region1Start, region2Start;
             if (_blockSplitFlag[gr][ch] && _blockType[gr][ch] == 2)
@@ -896,7 +871,7 @@ namespace XLayer.Decoder
                 region2Start = _sfBandIndexL[Math.Min(_regionAddress1[gr][ch] + _regionAddress2[gr][ch] + 2, 22)];
             }
 
-            var part3end = _bitRes.BitsRead - sfBits + _part23Length[gr][ch];
+            long part3end = _bitRes.BitsRead - sfBits + _part23Length[gr][ch];
 
             int idx = 0, h = _tableSelect[gr][ch][0];
 
@@ -928,7 +903,7 @@ namespace XLayer.Decoder
             h = _count1TableSelect[gr][ch] + 32;
 
             // - 3 to ensure that we never get an out of range exception
-            while (part3end > _bitRes.BitsRead && idx < SBLIMIT * SSLIMIT - 3)
+            while (part3end > _bitRes.BitsRead && idx < LookupTables.SBLIMIT * SSLIMIT - 3)
             {
                 Huffman.Decode(_bitRes, h, out x, out y, out float v, out float w);
                 _samples[ch][idx] = Dequantize(idx, v, gr, ch); ++idx;
@@ -952,13 +927,13 @@ namespace XLayer.Decoder
             }
 
             // zero out the highest samples (defined as 0 in the standard)
-            if (idx < SBLIMIT * SSLIMIT)
+            if (idx < LookupTables.SBLIMIT * SSLIMIT)
             {
-                Array.Clear(_samples[ch], idx, SBLIMIT * SSLIMIT + 3 - idx);
+                Array.Clear(_samples[ch], idx, LookupTables.SBLIMIT * SSLIMIT + 3 - idx);
             }
         }
 
-        float Dequantize(int idx, float val, int gr, int ch)
+        private float Dequantize(int idx, float val, int gr, int ch)
         {
             if (val != 0f)
             {
@@ -984,12 +959,12 @@ namespace XLayer.Decoder
             return 0f;
         }
 
-        static readonly float[][] _isRatio = [
+        private static readonly float[][] _isRatio = [
                                                  [0f, 0.211324865405187f, 0.366025403784439f, 0.5f, 0.633974596215561f, 0.788675134594813f, 1f],
                                                  [1f, 0.788675134594813f, 0.633974596215561f, 0.5f, 0.366025403784439f, 0.211324865405187f, 0f]
                                              ];
 
-        static readonly float[][][] _lsfRatio = [   // sfc%2, ch, isPos
+        private static readonly float[][][] _lsfRatio = [   // sfc%2, ch, isPos
                                                     [
                                                         [1f, 0.840896415256f, 1f, 0.707106781190391f, 1f, 0.594603557506209f, 1f, 0.500000000005436f, 1f, 0.420448207632571f, 1f, 0.353553390599039f, 1f, 0.297301778756337f, 1f, 0.250000000005436f, 1f, 0.210224103818571f, 1f, 0.176776695301441f, 1f, 0.148650889379784f, 1f, 0.125000000004077f, 1f, 0.105112051910428f, 1f, 0.0883883476516816f, 1f, 0.0743254446907002f, 1f, 0.0625000000027179f],
                                                         [1f, 1f, 0.840896415256f, 1f, 0.707106781190391f, 1f, 0.594603557506209f, 1f, 0.500000000005436f, 1f, 0.420448207632571f, 1f, 0.353553390599039f, 1f, 0.297301778756337f, 1f, 0.250000000005436f, 1f, 0.210224103818571f, 1f, 0.176776695301441f, 1f, 0.148650889379784f, 1f, 0.125000000004077f, 1f, 0.105112051910428f, 1f, 0.0883883476516816f, 1f, 0.0743254446907002f, 1f],
@@ -1001,7 +976,7 @@ namespace XLayer.Decoder
                                                 ];
 
 
-        void Stereo(MpegChannelMode channelMode, int chanModeExt, int gr, bool lsf)
+        private void Stereo(MpegChannelMode channelMode, int chanModeExt, int gr, bool lsf)
         {
             // do the stereo decoding as needed...  This really only applies in two cases:
             //  1) Joint Stereo and one (or both) of the extensions are enabled, or
@@ -1009,7 +984,7 @@ namespace XLayer.Decoder
 
             if (channelMode == MpegChannelMode.JointStereo && chanModeExt != 0)
             {
-                var midSide = (chanModeExt & 0x2) == 2;
+                bool midSide = (chanModeExt & 0x2) == 2;
 
                 if ((chanModeExt & 0x1) == 1)
                 {
@@ -1019,7 +994,7 @@ namespace XLayer.Decoder
                     // find the highest sample index with a value in channel 1
                     //   - now each step only has to start from there
                     int lastValueIdx = -1;
-                    for (int i = SBLIMIT * SSLIMIT - (SBLIMIT + 1); i >= 0; i--)
+                    for (int i = LookupTables.SBLIMIT * SSLIMIT - (LookupTables.SBLIMIT + 1); i >= 0; i--)
                     {
                         if (_samples[1][i] != 0f)
                         {
@@ -1055,7 +1030,7 @@ namespace XLayer.Decoder
 
                     // long processing is far simpler than short...  just process from the start of the scalefactor band after the last non-zero sample
                     // we also don't have to mess with "finding" again; it was done above
-                    var sfb = 0;
+                    int sfb = 0;
                     if (lastValueIdx > -1)
                     {
                         sfb = _cbLookupL[lastValueIdx] + 1;
@@ -1077,9 +1052,9 @@ namespace XLayer.Decoder
                     // now process the intensity bands
                     for (; sfb < lEnd; sfb++)
                     {
-                        var i = _sfBandIndexL[sfb];
-                        var width = _sfBandIndexL[sfb + 1] - _sfBandIndexL[sfb];
-                        var isPos = _scalefac[1][3][sfb];
+                        int i = _sfBandIndexL[sfb];
+                        int width = _sfBandIndexL[sfb + 1] - _sfBandIndexL[sfb];
+                        int isPos = _scalefac[1][3][sfb];
                         if (isPos == 7)
                         {
                             if (midSide)
@@ -1104,7 +1079,7 @@ namespace XLayer.Decoder
                     if (sStart <= -1)
                     {
                         // do final long processing
-                        var isPos = _scalefac[1][3][20];
+                        int isPos = _scalefac[1][3][20];
                         if (isPos == 7)
                         {
                             if (midSide)
@@ -1131,7 +1106,7 @@ namespace XLayer.Decoder
                     else
                     {
                         // find where each window starts intensity processing
-                        var sSfb = new int[] { -1, -1, -1 };
+                        int[] sSfb = [-1, -1, -1];
                         int window;
                         if (lastValueIdx > -1)
                         {
@@ -1157,8 +1132,8 @@ namespace XLayer.Decoder
                                 continue;
                             }
 
-                            var width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
-                            var i = _sfBandIndexS[sfb] * 3 + width * (window + 1);
+                            int width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
+                            int i = _sfBandIndexS[sfb] * 3 + width * (window + 1);
 
                             while (--width >= -1)
                             {
@@ -1179,14 +1154,14 @@ namespace XLayer.Decoder
                         sfb = sStart;
                         for (; sfb < 12; sfb++)
                         {
-                            var width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
-                            var i = _sfBandIndexS[sfb] * 3;
+                            int width = _sfBandIndexS[sfb + 1] - _sfBandIndexS[sfb];
+                            int i = _sfBandIndexS[sfb] * 3;
 
                             for (window = 0; window < 3; window++)
                             {
                                 if (sfb > sSfb[window])
                                 {
-                                    var isPos = _scalefac[1][window][sfb];
+                                    int isPos = _scalefac[1][window][sfb];
                                     if (isPos == 7)
                                     {
                                         if (midSide)
@@ -1221,10 +1196,10 @@ namespace XLayer.Decoder
                         }
 
                         // do final short processing
-                        var finalWidth = _sfBandIndexS[13] - _sfBandIndexS[12];
+                        int finalWidth = _sfBandIndexS[13] - _sfBandIndexS[12];
                         for (window = 0; window < 3; window++)
                         {
-                            var isPos = _scalefac[1][window][11];
+                            int isPos = _scalefac[1][window][11];
                             if (isPos == 7)
                             {
                                 if (midSide)
@@ -1250,22 +1225,22 @@ namespace XLayer.Decoder
                 else if (midSide)
                 {
                     // just do mid/side processing for everything
-                    ApplyMidSide(0, SBLIMIT * SSLIMIT);
+                    ApplyMidSide(0, LookupTables.SBLIMIT * SSLIMIT);
                 }
                 else
                 {
                     // this is a no-op most of the time
-                    ApplyFullStereo(0, SSLIMIT * SBLIMIT);
+                    ApplyFullStereo(0, SSLIMIT * LookupTables.SBLIMIT);
                 }
             }
             else if (_channels != 1)
             {
                 // this is a no-op most of the time
-                ApplyFullStereo(0, SSLIMIT * SBLIMIT);
+                ApplyFullStereo(0, SSLIMIT * LookupTables.SBLIMIT);
             }
         }
 
-        void ApplyIStereo(int i, int sb, int isPos)
+        private void ApplyIStereo(int i, int sb, int isPos)
         {
             if (StereoMode == StereoMode.DownmixToMono)
             {
@@ -1276,8 +1251,8 @@ namespace XLayer.Decoder
             }
             else
             {
-                var ratio0 = _isRatio[0][isPos];
-                var ratio1 = _isRatio[1][isPos];
+                float ratio0 = _isRatio[0][isPos];
+                float ratio1 = _isRatio[1][isPos];
                 for (; sb > 0; sb--, i++)
                 {
                     _samples[1][i] = _samples[0][i] * ratio1;
@@ -1286,13 +1261,13 @@ namespace XLayer.Decoder
             }
         }
 
-        void ApplyLsfIStereo(int i, int sb, int isPos, int scalefacCompress)
+        private void ApplyLsfIStereo(int i, int sb, int isPos, int scalefacCompress)
         {
-            var k0 = _lsfRatio[scalefacCompress % 1][isPos][0];
-            var k1 = _lsfRatio[scalefacCompress % 1][isPos][1];
-            if (StereoMode == XLayer.StereoMode.DownmixToMono)
+            float k0 = _lsfRatio[scalefacCompress % 1][isPos][0];
+            float k1 = _lsfRatio[scalefacCompress % 1][isPos][1];
+            if (StereoMode == StereoMode.DownmixToMono)
             {
-                var ratio = 1 / (k0 + k1);
+                float ratio = 1 / (k0 + k1);
                 for (; sb > 0; sb--, i++)
                 {
                     _samples[0][i] *= ratio;
@@ -1308,7 +1283,7 @@ namespace XLayer.Decoder
             }
         }
 
-        void ApplyMidSide(int i, int sb)
+        private void ApplyMidSide(int i, int sb)
         {
             if (StereoMode == StereoMode.DownmixToMono)
             {
@@ -1322,17 +1297,17 @@ namespace XLayer.Decoder
                 for (; sb > 0; sb--, i++)
                 {
                     // apply the mid/side
-                    var a = _samples[0][i];
-                    var b = _samples[1][i];
+                    float a = _samples[0][i];
+                    float b = _samples[1][i];
                     _samples[0][i] = (a + b) * 0.707106781f;
                     _samples[1][i] = (a - b) * 0.707106781f;
                 }
             }
         }
 
-        void ApplyFullStereo(int i, int sb)
+        private void ApplyFullStereo(int i, int sb)
         {
-            if (StereoMode == XLayer.StereoMode.DownmixToMono)
+            if (StereoMode == StereoMode.DownmixToMono)
             {
                 for (; sb > 0; sb--, i++)
                 {
@@ -1341,18 +1316,17 @@ namespace XLayer.Decoder
             }
         }
 
-        readonly float[] _reorderBuf = new float[SBLIMIT * SSLIMIT];
-
-        void Reorder(float[] buf, bool mixedBlock)
+        private void Reorder(Span<float> buf, bool mixedBlock)
         {
+            Span<float> _reorderBuf = stackalloc float[LookupTables.SBLIMIT * SSLIMIT];
+
             // reorder into _reorderBuf, then copy back
             int sfb = 0;
 
             if (mixedBlock)
             {
                 // mixed... copy the first two bands and reorder the rest
-                Array.Copy(buf, 0, _reorderBuf, 0, SSLIMIT * 2);
-
+                buf[..(SSLIMIT * 2)].CopyTo(_reorderBuf);
                 sfb = 3;
             }
 
@@ -1365,8 +1339,8 @@ namespace XLayer.Decoder
                 {
                     for (int freq = 0; freq < sfb_lines; freq++)
                     {
-                        var src_line = sfb_start * 3 + window * sfb_lines + freq;
-                        var des_line = (sfb_start * 3) + window + (freq * 3);
+                        int src_line = sfb_start * 3 + window * sfb_lines + freq;
+                        int des_line = (sfb_start * 3) + window + (freq * 3);
                         _reorderBuf[des_line] = buf[src_line];
                     }
                 }
@@ -1374,20 +1348,20 @@ namespace XLayer.Decoder
                 ++sfb;
             }
 
-            Array.Copy(_reorderBuf, buf, SSLIMIT * SBLIMIT);
+            _reorderBuf[0..(SSLIMIT * LookupTables.SBLIMIT)].CopyTo(buf);
         }
 
-        static readonly float[] _scs = [
+        private static readonly float[] _scs = [
                                         0.85749292571254400f,  0.88174199731770500f,  0.94962864910273300f,  0.98331459249179000f,
                                         0.99551781606758600f,  0.99916055817814800f,  0.99989919524444700f,  0.99999315507028000f,
                                        ];
 
-        static readonly float[] _sca = [
+        private static readonly float[] _sca = [
                                        -0.51449575542752700f, -0.47173196856497200f, -0.31337745420390200f, -0.18191319961098100f,
                                        -0.09457419252642070f, -0.04096558288530410f, -0.01419856857247120f, -0.00369997467376004f,
                                        ];
 
-        static void AntiAlias(float[] buf, bool mixedBlock)
+        private static void AntiAlias(Span<float> buf, bool mixedBlock)
         {
             int sblim;
             if (mixedBlock)
@@ -1396,46 +1370,47 @@ namespace XLayer.Decoder
             }
             else
             {
-                sblim = SBLIMIT - 1;
+                sblim = LookupTables.SBLIMIT - 1;
             }
 
             for (int sb = 0, offset = 0; sb < sblim; sb++, offset += SSLIMIT)
             {
                 for (int ss = 0, buOfs = offset + SSLIMIT - 1, bdOfs = offset + SSLIMIT; ss < 8; ss++, buOfs--, bdOfs++)
                 {
-                    var bu = buf[buOfs];
-                    var bd = buf[bdOfs];
+                    float bu = buf[buOfs];
+                    float bd = buf[bdOfs];
                     buf[buOfs] = (bu * _scs[ss]) - (bd * _sca[ss]);
                     buf[bdOfs] = (bd * _scs[ss]) + (bu * _sca[ss]);
                 }
             }
         }
 
-        static void FrequencyInversion(float[] buf)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void FrequencyInversion(Span<float> buf)
         {
             for (int ss = 1; ss < SSLIMIT; ss += 2)
             {
-                for (int sb = 1; sb < SBLIMIT; sb += 2)
+                for (int sb = 1; sb < LookupTables.SBLIMIT; sb += 2)
                 {
                     buf[sb * SSLIMIT + ss] = -buf[sb * SSLIMIT + ss];
                 }
             }
         }
 
-        readonly float[] _polyPhase = new float[SBLIMIT];
-
         // Layer III interleaves the samples, so we have to make them linear again
-        void InversePolyphase(float[] buf, int ch, int ofs, float[] outBuf)
+        private void InversePolyphase(ReadOnlySpan<float> buf, int ch, int ofs, Span<float> outBuf)
         {
-            for (int ss = 0; ss < SSLIMIT; ss++, ofs += SBLIMIT)
+            Span<float> _polyPhase = stackalloc float[LookupTables.SBLIMIT];
+
+            for (int ss = 0; ss < SSLIMIT; ss++, ofs += LookupTables.SBLIMIT)
             {
-                for (int sb = 0; sb < SBLIMIT; sb++)
+                for (int sb = 0; sb < LookupTables.SBLIMIT; sb++)
                 {
                     _polyPhase[sb] = buf[sb * SSLIMIT + ss];
                 }
 
-                base.InversePolyPhase(ch, _polyPhase);
-                Array.Copy(_polyPhase, 0, outBuf, ofs, SBLIMIT);
+                InversePolyPhase(ch, _polyPhase);
+                _polyPhase[..LookupTables.SBLIMIT].CopyTo(outBuf.Slice(ofs, LookupTables.SBLIMIT));
             }
         }
     }

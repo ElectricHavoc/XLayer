@@ -2,20 +2,17 @@
 
 namespace XLayer.Decoder
 {
-    abstract class FrameBase
+    internal abstract class FrameBase
     {
-        static int _totalAllocation = 0;
-        static internal int TotalAllocation
-        {
-            get { return System.Threading.Interlocked.CompareExchange(ref _totalAllocation, 0, 0); }
-        }
+        private static int _totalAllocation = 0;
+        static internal int TotalAllocation => System.Threading.Interlocked.CompareExchange(ref _totalAllocation, 0, 0);
 
         internal long Offset { get; private set; }
         internal int Length { get; set; }
 
-        MpegStreamReader _reader;
+        private MpegStreamReader _reader;
 
-        byte[] _savedBuffer;
+        private byte[] _savedBuffer;
 
         protected FrameBase() { }
 
@@ -24,7 +21,7 @@ namespace XLayer.Decoder
             Offset = offset;
             _reader = reader;
 
-            var len = Validate();
+            int len = Validate();
 
             if (len > 0)
             {
@@ -34,12 +31,12 @@ namespace XLayer.Decoder
             return false;
         }
 
-        protected int Read(int offset, byte[] buffer)
+        protected int Read(int offset, Span<byte> buffer)
         {
             return Read(offset, buffer, 0, buffer.Length);
         }
 
-        protected int Read(int offset, byte[] buffer, int index, int count)
+        protected int Read(int offset, Span<byte> buffer, int index, int count)
         {
             if (_savedBuffer != null)
             {
@@ -47,7 +44,7 @@ namespace XLayer.Decoder
                 if (offset < 0 || offset >= _savedBuffer.Length) return 0;  // check against saved buffer
                 if (offset + count > _savedBuffer.Length) count = _savedBuffer.Length - index;  // twiddle the size as needed
 
-                Array.Copy(_savedBuffer, offset, buffer, index, count);
+                _savedBuffer.AsSpan(offset, count).CopyTo(buffer.Slice(index, count));
                 return count;
             }
             else
@@ -63,7 +60,7 @@ namespace XLayer.Decoder
                 ArgumentOutOfRangeException.ThrowIfNegative(offset);
                 if (offset >= _savedBuffer.Length) return -1;
 
-                return (int)_savedBuffer[offset];
+                return _savedBuffer[offset];
             }
             else
             {

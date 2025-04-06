@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace XLayer.Decoder
+﻿namespace XLayer.Decoder
 {
-    class ID3Frame : FrameBase
+    internal class ID3Frame : FrameBase
     {
         internal static ID3Frame TrySync(uint syncMark)
         {
@@ -29,9 +24,9 @@ namespace XLayer.Decoder
             return null;
         }
 
-        int _version;
+        private int _version;
 
-        ID3Frame()
+        private ID3Frame()
         {
 
         }
@@ -42,7 +37,7 @@ namespace XLayer.Decoder
             {
                 case 2:
                     // v2, yay!
-                    var buf = new byte[7];
+                    byte[] buf = new byte[7];
                     if (Read(3, buf) == 7)
                     {
                         byte flagsMask;
@@ -64,7 +59,7 @@ namespace XLayer.Decoder
                         // ignore the flags (we don't need them for the validation)
 
                         // get the size (7 bits per byte [MSB cleared])
-                        var size = (buf[3] << 21)
+                        int size = (buf[3] << 21)
                                  | (buf[4] << 14)
                                  | (buf[5] << 7)
                                  | (buf[6]);
@@ -102,7 +97,7 @@ namespace XLayer.Decoder
             }
         }
 
-        static void ParseV1(int offset)
+        private static void ParseV1(int offset)
         {
             //var buffer = new byte[125];
             //if (Read(offset, buffer) == 125)
@@ -138,7 +133,7 @@ namespace XLayer.Decoder
             //}
         }
 
-        void ParseV1Enh()
+        private static void ParseV1Enh()
         {
             ParseV1(230);
 
@@ -171,7 +166,7 @@ namespace XLayer.Decoder
             //}
         }
 
-        static void ParseV2()
+        private static void ParseV2()
         {
             // v2 is much more complicated than v1...  don't worry about it for now
             // look for any merged frames, as well

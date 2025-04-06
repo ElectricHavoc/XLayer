@@ -35,3 +35,11 @@ More information could be found in code documents.
 ## Use with NAudio
 
 I have not tested this port with NAudio
+
+## Testing
+
+XLayer.Tests project:
+
+- `dotnet run`, will compare NLayer samples = XLayer samples
+- `dotnet run -m`, helper that will run just XLayer for memory profiling
+- `dotnet run -b`, run benchmarks against NLayer
