@@ -15,7 +15,7 @@ The NLayer code was originally based
 on [JavaLayer](http://www.javazoom.net/javalayer/javalayer.html) (v1.0.1), 
 which has been ported to C#.
 
-Was previously hosted at [XLayer.codeplex.com](http://XLayer.codeplex.com/). 
+Was previously hosted at [NLayer.codeplex.com](http://NLayer.codeplex.com/). 
 Please see the history there for full details of contributors.
 
 ## Usage
@@ -47,6 +47,7 @@ I have not tested this port with NAudio
 
 XLayer.Tests project:
 
-- `dotnet run`, will compare NLayer samples = XLayer samples
-- `dotnet run -m`, helper that will run just XLayer for memory profiling
-- `dotnet run -b`, run benchmarks against NLayer
+- `dotnet run` Will compare NLayer samples = XLayer samples
+- `dotnet run -m` Helper that will run just XLayer for memory profiling
+- `dotnet run -b` Run benchmarks against NLayer
+- `dotnet run -p` Loop through ffmpeg pipe back to mp3 to validate audio quality
