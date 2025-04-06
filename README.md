@@ -56,4 +56,4 @@ XLayer.Tests project:
 ## Music 
 Sample music is from my god-father's classic rock band [The Toons](https://www.discogs.com/artist/767082-The-Toons). 
 
-![Cover](toons1.png)  ![Band](toons2.png)
+![Cover](https://raw.githubusercontent.com/ElectricHavoc/XLayer/refs/heads/master/toons1.png)  ![Band](https://raw.githubusercontent.com/ElectricHavoc/XLayer/refs/heads/master/toons2.png)
